@@ -1,0 +1,66 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Reservation {
+  id        String   @id @default(cuid())
+  tableId   String
+  name      String
+  date      DateTime
+  partySize Int
+  notes     String?
+  status    String   @default("pending")
+  createdAt DateTime @default(now())
+  table     Table    @relation(fields: [tableId], references: [id])
+}
+
+model Table {
+  id           String        @id @default(uuid())
+  number       String
+  label        String
+  status       String        @default("free")
+  orders       Order[]
+  reservations Reservation[]
+}
+
+model Order {
+  id        String      @id @default(uuid())
+  tableId   String
+  status    String      @default("pending")
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+  table     Table       @relation(fields: [tableId], references: [id])
+  items     OrderItem[]
+}
+
+model OrderItem {
+  id        String  @id @default(uuid())
+  orderId   String
+  productId String
+  quantity  Int
+  notes     String?
+  order     Order   @relation(fields: [orderId], references: [id])
+  product   Product @relation(fields: [productId], references: [id])
+}
+
+model Category {
+  id       String    @id @default(uuid())
+  name     String    @unique
+  products Product[]
+}
+
+model Product {
+  id              String      @id @default(uuid())
+  name            String
+  price           Decimal
+  available       Boolean     @default(true)
+  imageUrl        String?
+  categoryId      String?
+  requiresKitchen Boolean     @default(true)
+  items           OrderItem[]
+  category        Category?   @relation(fields: [categoryId], references: [id])
+}

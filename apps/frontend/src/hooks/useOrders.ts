@@ -1,0 +1,68 @@
+import { useEffect, useRef, useState } from "react";
+import { io, Socket } from "socket.io-client";
+import type { Order } from "@restaurante/types";
+
+interface UseOrdersReturn {
+  orders: Order[];
+  isConnected: boolean;
+}
+
+export function useOrders(): UseOrdersReturn {
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [isConnected, setIsConnected] = useState(false);
+  const socketRef = useRef<Socket | null>(null);
+
+  const API_BASE = import.meta.env.VITE_API_URL ?? "";
+
+  useEffect(() => {
+    // 1. Cargar órdenes activas al montar
+    fetch(`${API_BASE}/api/orders?status=pending,in_progress,ready`)
+      .then((r) => r.json())
+      .then(setOrders);
+
+    // 2. Conectar al servidor WebSocket
+    const socket = io(import.meta.env.VITE_API_URL, {
+      reconnectionAttempts: 5,
+      reconnectionDelay: 2000,
+    });
+    socketRef.current = socket;
+
+    socket.on("connect", () => {
+      console.log("[socket] Conectado:", socket.id);
+      setIsConnected(true);
+      socket.emit("join:kitchen");
+    });
+
+    socket.on("connect_error", (error) => {
+      console.error("[socket] Error de conexión:", error.message);
+    });
+
+    socket.on("disconnect", (reason) => {
+      console.log("[socket] Desconectado:", reason);
+      setIsConnected(false);
+    });
+
+    // 3. Nueva orden entrante — añadir al estado
+    socket.on("order:new", (order: Order) => {
+      setOrders((prev) => [order, ...prev]);
+    });
+
+    // 4. Orden actualizada — reemplazar en el estado
+    socket.on("order:updated", (updated: Pick<Order, "id" | "status">) => {
+      setOrders((prev) =>
+        updated.status === "delivered"
+          ? prev.filter((o) => o.id !== updated.id)
+          : prev.map((o) =>
+              o.id === updated.id ? { ...o, status: updated.status } : o
+            )
+      );
+    });
+
+    // 5. Limpiar al desmontar el componente
+    return () => {
+      socket.disconnect();
+    };
+  }, []);
+
+  return { orders, isConnected };
+}
