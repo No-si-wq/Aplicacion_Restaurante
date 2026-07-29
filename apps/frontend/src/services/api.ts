@@ -6,8 +6,12 @@ async function request<T>(
   path: string,
   options?: RequestInit
 ): Promise<T> {
+  const token = localStorage.getItem("token");
   const res = await fetch(`${BASE_URL}${path}`, {
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
     ...options,
   });
 
@@ -17,6 +21,26 @@ async function request<T>(
   }
 
   return res.json();
+}
+
+// ─── Autenticación ───────────────────────────────────────
+
+export interface AuthUser {
+  id: string;
+  username: string;
+  role: "ADMIN" | "VENDEDOR";
+}
+
+export interface LoginResponse {
+  token: string;
+  user: AuthUser;
+}
+
+export function login(username: string, password: string): Promise<LoginResponse> {
+  return request("/auth/login", {
+    method: "POST",
+    body: JSON.stringify({ username, password }),
+  });
 }
 
 // ─── Mesas ───────────────────────────────────────────────
@@ -75,24 +99,18 @@ export function deleteOrder(id: string): Promise<void> {
 
 // ─── Categorías ───────────────────────────────────────────
 export async function getCategories(): Promise<Category[]> {
-  const res = await fetch(`${BASE_URL}/categories`);
-  if (!res.ok) throw new Error("Error al obtener categorías");
-  return res.json();
+  return request("/categories");
 }
 
 export async function createCategory(name: string): Promise<Category> {
-  const res = await fetch(`${BASE_URL}/categories`, {
+  return request("/categories", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ name }),
   });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
 }
 
 export async function deleteCategory(id: string): Promise<void> {
-  const res = await fetch(`${BASE_URL}/categories/${id}`, { method: "DELETE" });
-  if (!res.ok) throw new Error("Error al eliminar categoría");
+  return request(`/categories/${id}`, { method: "DELETE" });
 }
 
 // ─── Productos ───────────────────────────────────────────

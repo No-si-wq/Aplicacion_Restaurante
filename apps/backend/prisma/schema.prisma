@@ -6,6 +6,14 @@ datasource db {
   provider = "postgresql"
 }
 
+model User {
+  id        String   @id @default(uuid())
+  username  String   @unique
+  password  String
+  role      Role     @default(VENDEDOR)
+  createdAt DateTime @default(now())
+}
+
 model Reservation {
   id        String   @id @default(cuid())
   tableId   String
@@ -63,4 +71,9 @@ model Product {
   requiresKitchen Boolean     @default(true)
   items           OrderItem[]
   category        Category?   @relation(fields: [categoryId], references: [id])
+}
+
+enum Role {
+  ADMIN
+  VENDEDOR
 }

@@ -9,6 +9,7 @@ import { tablesRouter } from "./routes/tables.routes";
 import { productsRouter } from "./routes/products.routes";
 import categoriesRouter from "./routes/categories.routes";
 import reportsRouter from "./routes/reports.routes";
+import authRouter from "./routes/auth.routes"
 
 const app = express();
 const httpServer = createServer(app);
@@ -37,6 +38,7 @@ app.use("/api/tables", tablesRouter);
 app.use("/api/products", productsRouter);
 app.use("/api/categories", categoriesRouter);
 app.use("/api/reports", reportsRouter);
+app.use("/api/auth", authRouter);
 
 io.on("connection", (socket) => {
   console.log(`[socket] Cliente conectado: ${socket.id}`);

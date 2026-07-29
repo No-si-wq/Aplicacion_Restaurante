@@ -1,17 +1,32 @@
 // App.tsx
-import { BrowserRouter, Routes, Route, NavLink, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, NavLink, Navigate, useLocation } from "react-router-dom";
 import SalaView from "./views/SalaView";
 import CocinaView from "./views/CocinaView";
 import AdminView from "./views/AdminView";
 import AdminGuard from "./components/AdminGuard";
 import ReportsView from "./views/ReportsView";
+import LoginView from "./views/LoginView";
+import { AuthProvider, useAuth } from "./context/AuthContext";
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <div className="min-h-screen bg-gray-50 pb-16 sm:pb-0">
+    <AuthProvider>
+      <BrowserRouter>
+        <AppContent />
+      </BrowserRouter>
+    </AuthProvider>
+  );
+}
 
-        {/* Navegación */}
+function AppContent() {
+  const { user, logout } = useAuth();
+  const location = useLocation();
+  const isLoginPage = location.pathname === "/login";
+  return (
+    <div className="min-h-screen bg-gray-50 pb-16 sm:pb-0">
+
+      {/* Navegación */}
+      {!isLoginPage && (
         <nav className="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
           <p className="text-sm font-medium text-gray-900">Restaurante App</p>
           <div className="hidden sm:flex items-center gap-3">
@@ -42,59 +57,87 @@ export default function App() {
               </NavLink>
             </div>
 
-            <NavLink
-              to="/reportes"
-              className={({ isActive }) =>
-                `px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                  isActive
-                    ? "bg-white text-gray-900 shadow-sm"
-                    : "text-gray-500 hover:text-gray-700"
-                }`
-              }
-            >
-              Reportes
-            </NavLink>
+            {user?.role === "ADMIN" && (
+              <NavLink
+                to="/reportes"
+                className={({ isActive }) =>
+                  `px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                    isActive
+                      ? "bg-white text-gray-900 shadow-sm"
+                      : "text-gray-500 hover:text-gray-700"
+                  }`
+                }
+              >
+                Reportes
+              </NavLink>
+            )}
 
             {/* Acceso a admin separado del nav principal */}
-            <NavLink
-              to="/admin"
-              className={({ isActive }) =>
-                `text-xs px-3 py-1.5 rounded-lg border transition-colors ${
-                  isActive
-                    ? "border-gray-800 text-gray-900 bg-gray-100"
-                    : "border-gray-200 text-gray-400 hover:text-gray-600 hover:border-gray-300"
-                }`
-              }
+            {user?.role === "ADMIN" && (
+              <NavLink
+                to="/admin"
+                className={({ isActive }) =>
+                  `text-xs px-3 py-1.5 rounded-lg border transition-colors ${
+                    isActive
+                      ? "border-gray-800 text-gray-900 bg-gray-100"
+                      : "border-gray-200 text-gray-400 hover:text-gray-600 hover:border-gray-300"
+                  }`
+                }
+              >
+                Admin
+              </NavLink>
+            )}
+
+            <button
+              onClick={logout}
+              className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-400 hover:text-gray-600 hover:border-gray-300"
             >
-              Admin
-            </NavLink>
+              Salir ({user?.username})
+            </button>
           </div>
         </nav>
+      )}
 
-        {/* Rutas */}
-        <Routes>
-          <Route path="/sala"   element={<SalaView />} />
-          <Route path="/cocina" element={<CocinaView />} />
-          <Route
-            path="/reportes"
-            element={
-              <AdminGuard>
-                <ReportsView />
-              </AdminGuard>
-            }
-          />
-          <Route
-            path="/admin"
-            element={
-              <AdminGuard>
-                <AdminView />
-              </AdminGuard>
-            }
-          />
-          <Route path="*" element={<Navigate to="/sala" replace />} />
-        </Routes>
-        
-        {/* Bottom nav — solo móvil */}
+      {/* Rutas */}
+      <Routes>
+        <Route path="/login" element={<LoginView />} />
+        <Route
+          path="/sala"
+          element={
+            <AdminGuard allowedRoles={["ADMIN", "VENDEDOR"]}>
+              <SalaView />
+            </AdminGuard>
+          }
+        />
+        <Route
+          path="/cocina"
+          element={
+            <AdminGuard allowedRoles={["ADMIN", "VENDEDOR"]}>
+              <CocinaView />
+            </AdminGuard>
+          }
+        />
+        <Route
+          path="/reportes"
+          element={
+            <AdminGuard>
+              <ReportsView />
+            </AdminGuard>
+          }
+        />
+        <Route
+          path="/admin"
+          element={
+            <AdminGuard>
+              <AdminView />
+            </AdminGuard>
+          }
+        />
+        <Route path="*" element={<Navigate to="/sala" replace />} />
+      </Routes>
+      
+      {/* Bottom nav — solo móvil */}
+      {!isLoginPage && (
         <nav className="sm:hidden fixed bottom-0 inset-x-0 bg-white border-t border-gray-200 flex z-50">
           {(
             [
@@ -136,8 +179,10 @@ export default function App() {
                   </svg>
                 ),
               },
-            ] as { to: string; label: string; icon: React.ReactNode }[]
-          ).map(({ to, label, icon }) => (
+          ] as { to: string; label: string; icon: React.ReactNode }[]
+        )
+          .filter((tab) => user?.role === "ADMIN" || (tab.to !== "/reportes" && tab.to !== "/admin"))
+          .map(({ to, label, icon }) => (
             <NavLink
               key={to}
               to={to}
@@ -152,8 +197,8 @@ export default function App() {
             </NavLink>
           ))}
         </nav>
+      )}
 
-      </div>
-    </BrowserRouter>
+    </div>
   );
 }
