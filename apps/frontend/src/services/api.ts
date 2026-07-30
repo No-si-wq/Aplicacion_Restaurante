@@ -252,13 +252,45 @@ export function updateReservationStatus(
   });
 }
 
-export interface TopProduct { name: string; quantity: number; revenue: number }
+export interface DayOrder {
+  invoiceNumber: number;
+  tableLabel: string;
+  importe: number;
+  isv: number;
+  total: number;
+}
+export interface DaySales {
+  date: string;
+  orders: DayOrder[];
+  subtotal: { importe: number; isv: number; total: number };
+}
 export interface SalesReport {
-  from: string; to: string;
-  totalOrders: number; totalRevenue: number;
-  topProducts: TopProduct[];
+  from: string;
+  to: string;
+  salesByDay: DaySales[];
+  grandTotal: { importe: number; isv: number; total: number };
 }
 
 export function getSalesReport(from: string, to: string): Promise<SalesReport> {
   return request(`/reports/sales?from=${from}&to=${to}`);
+}
+
+export interface ProductReportItem {
+  productId: string;
+  productName: string;
+  categoryName: string;
+  quantity: number;
+  importe: number;
+  isv: number;
+  total: number;
+}
+export interface ProductsSalesReport {
+  from: string;
+  to: string;
+  products: ProductReportItem[];
+  grandTotal: { quantity: number; importe: number; isv: number; total: number };
+}
+
+export function getProductsReport(from: string, to: string): Promise<ProductsSalesReport> {
+  return request(`/reports/products?from=${from}&to=${to}`);
 }

@@ -14,8 +14,8 @@ router.get("/sales", async (req: Request, res: Response) => {
 
   const fromDate = new Date(`${from}T00:00:00.000Z`);
   const toDate   = new Date(`${to}T23:59:59.999Z`);
+  const ISV_RATE = 0.15;
 
-  // Solo órdenes completadas/entregadas
   const orders = await prisma.order.findMany({
     where: {
       createdAt: { gte: fromDate, lte: toDate },
@@ -23,40 +23,132 @@ router.get("/sales", async (req: Request, res: Response) => {
     },
     include: {
       table: true,
-      items: {
-        include: { product: true },
-      },
+      items: { include: { product: true } },
     },
+    orderBy: { createdAt: "asc" },
   });
 
-  // Totales por orden
-  const ordersWithTotal = orders.map((order) => {
-    const total = order.items.reduce(
+  type DayBucket = {
+    date: string;
+    orders: { invoiceNumber: number; tableLabel: string; importe: number; isv: number; total: number }[];
+  };
+
+  const dayMap: Record<string, DayBucket> = {};
+
+  for (const order of orders) {
+    const importe = order.items.reduce(
       (sum, item) => sum + Number(item.product.price) * item.quantity,
       0
     );
-    return { ...order, total };
+    const isv = Number((importe * ISV_RATE).toFixed(2));
+    const total = Number((importe + isv).toFixed(2));
+
+    const dayKey = order.createdAt.toISOString().slice(0, 10);
+    if (!dayMap[dayKey]) dayMap[dayKey] = { date: dayKey, orders: [] };
+
+    dayMap[dayKey].orders.push({
+      invoiceNumber: order.invoiceNumber,
+      tableLabel: order.table.label,
+      importe: Number(importe.toFixed(2)),
+      isv,
+      total,
+    });
+  }
+
+  const salesByDay = Object.values(dayMap)
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .map((day) => {
+      const subtotal = day.orders.reduce(
+        (acc, o) => ({
+          importe: acc.importe + o.importe,
+          isv: acc.isv + o.isv,
+          total: acc.total + o.total,
+        }),
+        { importe: 0, isv: 0, total: 0 }
+      );
+      return { ...day, subtotal };
+    });
+
+  const grandTotal = salesByDay.reduce(
+    (acc, day) => ({
+      importe: acc.importe + day.subtotal.importe,
+      isv: acc.isv + day.subtotal.isv,
+      total: acc.total + day.subtotal.total,
+    }),
+    { importe: 0, isv: 0, total: 0 }
+  );
+
+  res.json({ from, to, salesByDay, grandTotal });
+});
+
+// GET /api/reports/products?from=2026-01-01&to=2026-01-31
+router.get("/products", async (req: Request, res: Response) => {
+  const { from, to } = req.query;
+
+  if (!from || !to) {
+    return res.status(400).json({ error: "Params 'from' and 'to' are required (YYYY-MM-DD)" });
+  }
+
+  const fromDate = new Date(`${from}T00:00:00.000Z`);
+  const toDate   = new Date(`${to}T23:59:59.999Z`);
+  const ISV_RATE = 0.15;
+
+  const orders = await prisma.order.findMany({
+    where: {
+      createdAt: { gte: fromDate, lte: toDate },
+      status: { in: ["completed", "delivered"] },
+    },
+    include: {
+      items: { include: { product: { include: { category: true } } } },
+    },
   });
 
-  // Resumen global
-  const totalRevenue = ordersWithTotal.reduce((sum, o) => sum + o.total, 0);
-  const totalOrders  = ordersWithTotal.length;
+  type ProductBucket = {
+    productId: string;
+    productName: string;
+    categoryName: string;
+    quantity: number;
+    importe: number;
+  };
 
-  // Top productos
-  const productMap: Record<string, { name: string; quantity: number; revenue: number }> = {};
-  for (const order of ordersWithTotal) {
+  const productMap: Record<string, ProductBucket> = {};
+
+  for (const order of orders) {
     for (const item of order.items) {
-      const id = item.product.id;
-      if (!productMap[id]) {
-        productMap[id] = { name: item.product.name, quantity: 0, revenue: 0 };
+      const key = item.productId;
+      if (!productMap[key]) {
+        productMap[key] = {
+          productId: key,
+          productName: item.product.name,
+          categoryName: item.product.category?.name ?? "Sin categoría",
+          quantity: 0,
+          importe: 0,
+        };
       }
-      productMap[id].quantity += item.quantity;
-      productMap[id].revenue  += Number(item.product.price) * item.quantity;
+      productMap[key].quantity += item.quantity;
+      productMap[key].importe += Number(item.product.price) * item.quantity;
     }
   }
-  const topProducts = Object.values(productMap).sort((a, b) => b.revenue - a.revenue);
 
-  res.json({ from, to, totalOrders, totalRevenue, topProducts, orders: ordersWithTotal });
+  const products = Object.values(productMap)
+    .map((p) => {
+      const isv = Number((p.importe * ISV_RATE).toFixed(2));
+      const total = Number((p.importe + isv).toFixed(2));
+      return { ...p, importe: Number(p.importe.toFixed(2)), isv, total };
+    })
+    .sort((a, b) => b.quantity - a.quantity);
+
+  const grandTotal = products.reduce(
+    (acc, p) => ({
+      quantity: acc.quantity + p.quantity,
+      importe: acc.importe + p.importe,
+      isv: acc.isv + p.isv,
+      total: acc.total + p.total,
+    }),
+    { quantity: 0, importe: 0, isv: 0, total: 0 }
+  );
+
+  res.json({ from, to, products, grandTotal });
 });
 
 export default router;

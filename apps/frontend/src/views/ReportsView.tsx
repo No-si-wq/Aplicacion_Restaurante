@@ -1,20 +1,28 @@
 // apps/frontend/src/views/ReportsView.tsx
 import { useState } from "react";
-import { getSalesReport, type SalesReport } from "../services/api";
+import { getSalesReport, getProductsReport, type SalesReport, type ProductsSalesReport } from "../services/api";
+import { exportToExcel, exportToPDF } from "../utils/exportReport";
 
 export default function ReportsView() {
   const today = new Date().toISOString().slice(0, 10);
+  const [tab, setTab]         = useState<"ventas" | "productos">("ventas");
   const [from, setFrom]       = useState(today);
   const [to, setTo]           = useState(today);
   const [data, setData]       = useState<SalesReport | null>(null);
+  const [productsData, setProductsData] = useState<ProductsSalesReport | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState("");
 
   const fetchReport = async () => {
     setLoading(true); setError("");
     try {
-      const report = await getSalesReport(from, to);
-      setData(report);
+      if (tab === "ventas") {
+        const report = await getSalesReport(from, to);
+        setData(report);
+      } else {
+        const report = await getProductsReport(from, to);
+        setProductsData(report);
+      }
     } catch {
       setError("Error al obtener el reporte");
     } finally {
@@ -22,9 +30,88 @@ export default function ReportsView() {
     }
   };
 
+  const handleExportExcel = () => {
+    if (tab === "ventas" && data) {
+      const rows: (string | number)[][] = [];
+      data.salesByDay.forEach((day) => {
+        day.orders.forEach((o) => {
+          rows.push([day.date, o.invoiceNumber, o.tableLabel, o.importe, o.isv, o.total]);
+        });
+        rows.push(["", "Subtotal del día", "", day.subtotal.importe, day.subtotal.isv, day.subtotal.total]);
+      });
+      rows.push(["", "TOTAL GENERAL", "", data.grandTotal.importe, data.grandTotal.isv, data.grandTotal.total]);
+      exportToExcel(
+        `reporte-ventas_${from}_${to}.xlsx`,
+        "Ventas",
+        ["Fecha", "# Factura", "Mesa", "Importe", "ISV", "Total"],
+        rows
+      );
+    } else if (tab === "productos" && productsData) {
+      const rows = productsData.products.map((p) => [
+        p.productName, p.categoryName, p.quantity, p.importe, p.isv, p.total,
+      ]);
+      rows.push(["TOTAL GENERAL", "", productsData.grandTotal.quantity, productsData.grandTotal.importe, productsData.grandTotal.isv, productsData.grandTotal.total]);
+      exportToExcel(
+        `reporte-productos_${from}_${to}.xlsx`,
+        "Productos",
+        ["Producto", "Categoría", "Cantidad", "Importe", "ISV", "Total"],
+        rows
+      );
+    }
+  };
+
+  const handleExportPDF = () => {
+    if (tab === "ventas" && data) {
+      const rows: (string | number)[][] = [];
+      data.salesByDay.forEach((day) => {
+        day.orders.forEach((o) => {
+          rows.push([day.date, o.invoiceNumber, o.tableLabel, `L. ${o.importe.toFixed(2)}`, `L. ${o.isv.toFixed(2)}`, `L. ${o.total.toFixed(2)}`]);
+        });
+        rows.push(["", "Subtotal del día", "", `L. ${day.subtotal.importe.toFixed(2)}`, `L. ${day.subtotal.isv.toFixed(2)}`, `L. ${day.subtotal.total.toFixed(2)}`]);
+      });
+      rows.push(["", "TOTAL GENERAL", "", `L. ${data.grandTotal.importe.toFixed(2)}`, `L. ${data.grandTotal.isv.toFixed(2)}`, `L. ${data.grandTotal.total.toFixed(2)}`]);
+      exportToPDF(
+        `reporte-ventas_${from}_${to}.pdf`,
+        `Reporte de Ventas (${from} a ${to})`,
+        ["Fecha", "# Factura", "Mesa", "Importe", "ISV", "Total"],
+        rows
+      );
+    } else if (tab === "productos" && productsData) {
+      const rows = productsData.products.map((p) => [
+        p.productName, p.categoryName, p.quantity, `L. ${p.importe.toFixed(2)}`, `L. ${p.isv.toFixed(2)}`, `L. ${p.total.toFixed(2)}`,
+      ]);
+      rows.push(["TOTAL GENERAL", "", productsData.grandTotal.quantity, `L. ${productsData.grandTotal.importe.toFixed(2)}`, `L. ${productsData.grandTotal.isv.toFixed(2)}`, `L. ${productsData.grandTotal.total.toFixed(2)}`]);
+      exportToPDF(
+        `reporte-productos_${from}_${to}.pdf`,
+        `Reporte de Productos Vendidos (${from} a ${to})`,
+        ["Producto", "Categoría", "Cantidad", "Importe", "ISV", "Total"],
+        rows
+      );
+    }
+  };
+
   return (
     <div className="p-4 sm:p-6 max-w-3xl mx-auto">
-      <h1 className="text-xl sm:text-2xl font-bold mb-6">Reporte de Ventas</h1>
+      <h1 className="text-xl sm:text-2xl font-bold mb-4">Reportes</h1>
+
+      <div className="flex gap-1 bg-gray-100 p-1 rounded-lg mb-6 w-fit">
+        <button
+          onClick={() => setTab("ventas")}
+          className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+            tab === "ventas" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"
+          }`}
+        >
+          Ventas
+        </button>
+        <button
+          onClick={() => setTab("productos")}
+          className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+            tab === "productos" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"
+          }`}
+        >
+          Productos
+        </button>
+      </div>
 
       {/* Controles de fecha
           CAMBIO: flex-col en móvil → flex-row desde sm */}
@@ -58,50 +145,114 @@ export default function ReportsView() {
 
       {error && <p className="text-red-500 mb-4">{error}</p>}
 
-      {data && (
-        <div className="space-y-6">
+      {((tab === "ventas" && data) || (tab === "productos" && productsData)) && (
+        <div className="flex gap-2 mb-4">
+          <button
+            onClick={handleExportExcel}
+            className="text-sm px-3 py-1.5 rounded border border-green-600 text-green-700 hover:bg-green-50"
+          >
+            Exportar Excel
+          </button>
+          <button
+            onClick={handleExportPDF}
+            className="text-sm px-3 py-1.5 rounded border border-red-600 text-red-700 hover:bg-red-50"
+          >
+            Exportar PDF
+          </button>
+        </div>
+      )}
 
-          {/* Resumen
-              CAMBIO: grid-cols-1 en móvil, 2 columnas desde sm */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="border rounded p-4">
-              <p className="text-sm text-gray-500">Órdenes completadas</p>
-              <p className="text-3xl font-bold">{data.totalOrders}</p>
-            </div>
-            <div className="border rounded p-4">
-              <p className="text-sm text-gray-500">Ingresos totales</p>
-              <p className="text-3xl font-bold">
-                L. {Number(data.totalRevenue).toFixed(2)}
-              </p>
-            </div>
-          </div>
-
-          {/* Top productos
-              CAMBIO: overflow-x-auto para que la tabla no rompa en móvil */}
-          <div>
-            <h2 className="font-semibold mb-2">Productos más vendidos</h2>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm border-collapse">
-                <thead>
-                  <tr className="bg-gray-100 text-left">
-                    <th className="p-2">Producto</th>
-                    <th className="p-2 text-right">Cantidad</th>
-                    <th className="p-2 text-right">Ingresos</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.topProducts.map((p) => (
-                    <tr key={p.name} className="border-t">
-                      <td className="p-2">{p.name}</td>
-                      <td className="p-2 text-right">{p.quantity}</td>
-                      <td className="p-2 text-right">L. {p.revenue.toFixed(2)}</td>
+      {tab === "ventas" && data && (
+        <div className="space-y-8">
+          {data.salesByDay.map((day) => (
+            <div key={day.date}>
+              <h2 className="font-semibold mb-2">
+                {new Date(day.date + "T00:00:00").toLocaleDateString("es-HN", {
+                  weekday: "long", year: "numeric", month: "long", day: "numeric",
+                })}
+              </h2>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm border-collapse">
+                  <thead>
+                    <tr className="bg-gray-100 text-left">
+                      <th className="p-2"># Factura</th>
+                      <th className="p-2">Mesa</th>
+                      <th className="p-2 text-right">Importe</th>
+                      <th className="p-2 text-right">ISV</th>
+                      <th className="p-2 text-right">Total</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {day.orders.map((o) => (
+                      <tr key={o.invoiceNumber} className="border-t">
+                        <td className="p-2">{o.invoiceNumber}</td>
+                        <td className="p-2">{o.tableLabel}</td>
+                        <td className="p-2 text-right">L. {o.importe.toFixed(2)}</td>
+                        <td className="p-2 text-right">L. {o.isv.toFixed(2)}</td>
+                        <td className="p-2 text-right">L. {o.total.toFixed(2)}</td>
+                      </tr>
+                    ))}
+                    <tr className="border-t font-semibold bg-gray-50">
+                      <td className="p-2" colSpan={2}>Subtotal del día</td>
+                      <td className="p-2 text-right">L. {day.subtotal.importe.toFixed(2)}</td>
+                      <td className="p-2 text-right">L. {day.subtotal.isv.toFixed(2)}</td>
+                      <td className="p-2 text-right">L. {day.subtotal.total.toFixed(2)}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
             </div>
-          </div>
+          ))}
 
+          {/* Totalización general */}
+          <div className="border-t-2 border-gray-800 pt-3">
+            <table className="w-full text-sm">
+              <tbody>
+                <tr className="font-bold">
+                  <td className="p-2" colSpan={2}>TOTAL GENERAL</td>
+                  <td className="p-2 text-right">L. {data.grandTotal.importe.toFixed(2)}</td>
+                  <td className="p-2 text-right">L. {data.grandTotal.isv.toFixed(2)}</td>
+                  <td className="p-2 text-right">L. {data.grandTotal.total.toFixed(2)}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {tab === "productos" && productsData && (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm border-collapse">
+            <thead>
+              <tr className="bg-gray-100 text-left">
+                <th className="p-2">Producto</th>
+                <th className="p-2">Categoría</th>
+                <th className="p-2 text-right">Cantidad</th>
+                <th className="p-2 text-right">Importe</th>
+                <th className="p-2 text-right">ISV</th>
+                <th className="p-2 text-right">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {productsData.products.map((p) => (
+                <tr key={p.productId} className="border-t">
+                  <td className="p-2">{p.productName}</td>
+                  <td className="p-2 text-gray-500">{p.categoryName}</td>
+                  <td className="p-2 text-right">{p.quantity}</td>
+                  <td className="p-2 text-right">L. {p.importe.toFixed(2)}</td>
+                  <td className="p-2 text-right">L. {p.isv.toFixed(2)}</td>
+                  <td className="p-2 text-right">L. {p.total.toFixed(2)}</td>
+                </tr>
+              ))}
+              <tr className="border-t font-bold bg-gray-50">
+                <td className="p-2" colSpan={2}>TOTAL GENERAL</td>
+                <td className="p-2 text-right">{productsData.grandTotal.quantity}</td>
+                <td className="p-2 text-right">L. {productsData.grandTotal.importe.toFixed(2)}</td>
+                <td className="p-2 text-right">L. {productsData.grandTotal.isv.toFixed(2)}</td>
+                <td className="p-2 text-right">L. {productsData.grandTotal.total.toFixed(2)}</td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       )}
     </div>

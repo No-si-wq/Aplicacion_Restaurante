@@ -36,13 +36,14 @@ model Table {
 }
 
 model Order {
-  id        String      @id @default(uuid())
-  tableId   String
-  status    String      @default("pending")
-  createdAt DateTime    @default(now())
-  updatedAt DateTime    @updatedAt
-  table     Table       @relation(fields: [tableId], references: [id])
-  items     OrderItem[]
+  id            String      @id @default(uuid())
+  tableId       String
+  status        String      @default("pending")
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  invoiceNumber Int         @unique @default(autoincrement())
+  table         Table       @relation(fields: [tableId], references: [id])
+  items         OrderItem[]
 }
 
 model OrderItem {
