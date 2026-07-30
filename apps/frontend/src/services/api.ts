@@ -43,6 +43,44 @@ export function login(username: string, password: string): Promise<LoginResponse
   });
 }
 
+// ─── Usuarios ────────────────────────────────────────────
+
+export interface AppUser {
+  id: string;
+  username: string;
+  role: "ADMIN" | "VENDEDOR";
+  createdAt: string;
+}
+
+export function getUsers(): Promise<AppUser[]> {
+  return request("/users");
+}
+
+export function createUser(data: {
+  username: string;
+  password: string;
+  role: "ADMIN" | "VENDEDOR";
+}): Promise<AppUser> {
+  return request("/users", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export function updateUser(
+  id: string,
+  data: Partial<{ username: string; password: string; role: "ADMIN" | "VENDEDOR" }>
+): Promise<AppUser> {
+  return request(`/users/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(data),
+  });
+}
+
+export function deleteUser(id: string): Promise<void> {
+  return request(`/users/${id}`, { method: "DELETE" });
+}
+
 // ─── Mesas ───────────────────────────────────────────────
 
 export function getTables(): Promise<Table[]> {

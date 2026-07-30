@@ -5,6 +5,7 @@ import CocinaView from "./views/CocinaView";
 import AdminView from "./views/AdminView";
 import AdminGuard from "./components/AdminGuard";
 import ReportsView from "./views/ReportsView";
+import UserManager from "./components/UserManager";
 import LoginView from "./views/LoginView";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 
@@ -88,6 +89,21 @@ function AppContent() {
               </NavLink>
             )}
 
+            {user?.role === "ADMIN" && (
+              <NavLink
+                to="/usuarios"
+                className={({ isActive }) =>
+                  `text-xs px-3 py-1.5 rounded-lg border transition-colors ${
+                    isActive
+                      ? "border-gray-800 text-gray-900 bg-gray-100"
+                      : "border-gray-200 text-gray-400 hover:text-gray-600 hover:border-gray-300"
+                  }`
+                }
+              >
+                Usuarios
+              </NavLink>
+            )}
+
             <button
               onClick={logout}
               className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-400 hover:text-gray-600 hover:border-gray-300"
@@ -130,6 +146,14 @@ function AppContent() {
           element={
             <AdminGuard>
               <AdminView />
+            </AdminGuard>
+          }
+        />
+        <Route
+          path="/usuarios"
+          element={
+            <AdminGuard>
+              <UserManager />
             </AdminGuard>
           }
         />
