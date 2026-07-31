@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import type { Order } from "@restaurante/types";
 import { TICKET_FIELD_CATALOG } from "@restaurante/types";
-import { getActiveTicketTemplate, type TicketTemplate } from "../services/api";
+import { getTicketTemplates, type TicketTemplate } from "../services/api";
 
 interface InvoiceTemplateProps {
   orders: Order[]; // todas las órdenes de la mesa ya facturadas (mismo caiId/invoiceNumber)
@@ -20,14 +20,22 @@ const BUSINESS = {
 };
 
 export function InvoiceTemplate({ orders }: InvoiceTemplateProps) {
-  const [template, setTemplate] = useState<TicketTemplate | null>(null);
+  const [templates, setTemplates] = useState<TicketTemplate[]>([]);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
-    getActiveTicketTemplate()
-      .then(setTemplate)
+    getTicketTemplates()
+      .then((list) => {
+        setTemplates(list);
+        // por defecto: la plantilla activa; si no hay activa, la más reciente
+        const active = list.find((t) => t.isActive) ?? list[0] ?? null;
+        setSelectedId(active?.id ?? null);
+      })
       .catch((e) => setLoadError(e.message ?? "No se pudo cargar el formato de ticket"));
   }, []);
+
+   const template = templates.find((t) => t.id === selectedId) ?? null;
 
   if (orders.length === 0) return null;
 
@@ -77,14 +85,22 @@ export function InvoiceTemplate({ orders }: InvoiceTemplateProps) {
   if (loadError) {
     return (
       <p className="text-sm text-red-700 bg-red-50 border border-red-200 rounded p-3">
-        No se pudo cargar el formato de ticket activo: {loadError}. Configúralo en
+        No se pudo cargar los formatos de ticket: {loadError}. Configúralo en
         "Formato ticket" antes de imprimir.
       </p>
     );
   }
 
-  if (!template) {
+  if (templates.length === 0) {
     return <p className="text-sm text-gray-500">Cargando formato de ticket...</p>;
+  }
+
+  if (!template) {
+    return (
+      <p className="text-sm text-red-700 bg-red-50 border border-red-200 rounded p-3">
+        No hay ningún formato de ticket disponible. Crea uno en "Formato ticket" antes de imprimir.
+      </p>
+    );
   }
 
   const fields = [...template.layout.fields]
@@ -93,12 +109,25 @@ export function InvoiceTemplate({ orders }: InvoiceTemplateProps) {
 
   return (
     <div>
-      <button
-        onClick={() => window.print()}
-        className="mb-3 bg-terracota-600 text-white text-sm px-4 py-2 rounded sm:w-auto w-full print:hidden"
-      >
-        Imprimir factura
-      </button>
+      <div className="mb-3 flex flex-col sm:flex-row gap-2 print:hidden">
+        <select
+          value={selectedId ?? ""}
+          onChange={(e) => setSelectedId(e.target.value)}
+          className="text-sm border border-gray-200 rounded px-3 py-2 flex-1"
+        >
+          {templates.map((t) => (
+            <option key={t.id} value={t.id}>
+              {t.name} (v{t.version}){t.isActive ? " — activa" : ""}
+            </option>
+          ))}
+        </select>
+        <button
+          onClick={() => window.print()}
+          className="bg-orange-600 text-white text-sm px-4 py-2 rounded sm:w-auto w-full"
+        >
+          Imprimir factura
+        </button>
+      </div>
 
       <div
         className="print-receipt mx-auto bg-white text-black text-xs font-mono p-2"

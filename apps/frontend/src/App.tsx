@@ -10,6 +10,7 @@ import UserManager from "./components/UserManager";
 import LoginView from "./views/LoginView";
 import { TicketTemplateEditorView } from "./views/TicketTemplateEditorView";
 import { AuthProvider, useAuth } from "./context/AuthContext";
+import FacturasView from "./views/FacturasView";
 
 export default function App() {
   return (
@@ -80,6 +81,17 @@ function AppContent() {
                 Reportes
               </NavLink>
             )}
+
+            <NavLink
+              to="/facturas"
+              className={({ isActive }) =>
+                `px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                  isActive ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"
+                }`
+              }
+            >
+              Facturas
+            </NavLink>
 
             {/* Acceso a admin separado del nav principal */}
             {user?.role === "ADMIN" && (
@@ -161,6 +173,14 @@ function AppContent() {
           element={
             <AdminGuard>
               <ReportsView />
+            </AdminGuard>
+          }
+        />
+        <Route
+          path="/facturas"
+          element={
+            <AdminGuard allowedRoles={["ADMIN", "VENDEDOR"]}>
+              <FacturasView />
             </AdminGuard>
           }
         />
@@ -293,6 +313,13 @@ function AppContent() {
             className="block px-4 py-3 text-sm font-medium text-gray-700 rounded-lg hover:bg-gray-100"
           >
             Formato ticket
+          </NavLink>
+          <NavLink
+            to="/facturas"
+            onClick={() => setShowMore(false)}
+            className="block px-4 py-3 text-sm font-medium text-gray-700 rounded-lg hover:bg-gray-100"
+          >
+            Facturas
           </NavLink>
         </div>
       )}

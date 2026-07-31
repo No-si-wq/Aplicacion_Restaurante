@@ -6,9 +6,25 @@ datasource db {
   provider = "postgresql"
 }
 
+model Company {
+  id              String           @id @default(uuid())
+  name            String
+  slug            String           @unique
+  isActive        Boolean          @default(true)
+  plan            String           @default("basic")
+  createdAt       DateTime         @default(now())
+  cais            Cai[]
+  categories      Category[]
+  orders          Order[]
+  products        Product[]
+  tables          Table[]
+  ticketTemplates TicketTemplate[]
+  users           User[]
+}
+
 model Cai {
   id            String   @id @default(uuid())
-  code          String   @unique
+  code          String
   establishment String
   pointOfSale   String
   documentType  String   @default("01")
@@ -19,17 +35,25 @@ model Cai {
   isActive      Boolean  @default(true)
   userId        String
   createdAt     DateTime @default(now())
+  companyId     String
+  company       Company  @relation(fields: [companyId], references: [id])
   user          User     @relation(fields: [userId], references: [id])
   orders        Order[]
+
+  @@unique([companyId, code])
 }
 
 model User {
   id        String   @id @default(uuid())
-  username  String   @unique
+  username  String
   password  String
   role      Role     @default(VENDEDOR)
   createdAt DateTime @default(now())
+  companyId String
   cais      Cai[]
+  company   Company  @relation(fields: [companyId], references: [id])
+
+  @@unique([companyId, username])
 }
 
 model Reservation {
@@ -49,8 +73,12 @@ model Table {
   number       String
   label        String
   status       String        @default("free")
+  companyId    String
   orders       Order[]
   reservations Reservation[]
+  company      Company       @relation(fields: [companyId], references: [id])
+
+  @@unique([companyId, number])
 }
 
 model Order {
@@ -61,7 +89,9 @@ model Order {
   updatedAt     DateTime    @updatedAt
   invoiceNumber Int?
   caiId         String?
+  companyId     String
   cai           Cai?        @relation(fields: [caiId], references: [id])
+  company       Company     @relation(fields: [companyId], references: [id])
   table         Table       @relation(fields: [tableId], references: [id])
   items         OrderItem[]
 }
@@ -77,9 +107,13 @@ model OrderItem {
 }
 
 model Category {
-  id       String    @id @default(uuid())
-  name     String    @unique
-  products Product[]
+  id        String    @id @default(uuid())
+  name      String
+  companyId String
+  company   Company   @relation(fields: [companyId], references: [id])
+  products  Product[]
+
+  @@unique([companyId, name])
 }
 
 model Product {
@@ -90,8 +124,10 @@ model Product {
   imageUrl        String?
   categoryId      String?
   requiresKitchen Boolean     @default(true)
+  companyId       String
   items           OrderItem[]
   category        Category?   @relation(fields: [categoryId], references: [id])
+  company         Company     @relation(fields: [companyId], references: [id])
 }
 
 model TicketTemplate {
@@ -102,6 +138,8 @@ model TicketTemplate {
   layout    Json
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  companyId String
+  company   Company  @relation(fields: [companyId], references: [id])
 }
 
 enum Role {

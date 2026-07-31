@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { io, Socket } from "socket.io-client";
+import { getOrders } from "../services/api";
 import type { Order } from "@restaurante/types";
 
 interface UseOrdersReturn {
@@ -12,13 +13,11 @@ export function useOrders(): UseOrdersReturn {
   const [isConnected, setIsConnected] = useState(false);
   const socketRef = useRef<Socket | null>(null);
 
-  const API_BASE = import.meta.env.VITE_API_URL ?? "";
-
   useEffect(() => {
     // 1. Cargar órdenes activas al montar
-    fetch(`${API_BASE}/api/orders?status=pending,in_progress,ready,delivered`)
-      .then((r) => r.json())
-      .then((data: Order[]) => setOrders(data.filter((o) => !o.invoiceNumber)));
+    getOrders({ status: "pending,in_progress,ready,delivered" })
+      .then((data) => setOrders(data.filter((o) => !o.invoiceNumber)))
+      .catch((err) => console.error("[useOrders] Error al cargar órdenes:", err));
 
     // 2. Conectar al servidor WebSocket
     const socket = io(import.meta.env.VITE_API_URL, {

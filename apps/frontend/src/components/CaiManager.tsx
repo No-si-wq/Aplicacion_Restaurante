@@ -115,7 +115,7 @@ export function CaiManager({ users }: { users: UserOption[] }) {
         />
         <button
           onClick={handleSubmit}
-          className="sm:col-span-2 bg-terracota-600 text-white rounded px-4 py-2 text-sm font-medium"
+          className="sm:col-span-2 bg-orange-600 text-white rounded px-4 py-2 text-sm font-medium"
         >
           Asignar CAI
         </button>

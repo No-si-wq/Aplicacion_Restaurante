@@ -2,11 +2,10 @@ import { Router } from "express";
 import { Prisma } from "@prisma/client";
 import { prisma } from "../db/client";
 import { validateTicketLayout, TicketTemplateLayout } from "@restaurante/types";
+import { requireAuth } from "../middleware/auth.middleware";
 
 export const ticketTemplatesRouter = Router();
 
-// Conversión explícita y centralizada entre nuestro tipo fuerte y el Json de Prisma.
-// Evita repetir "as unknown as X" en cada handler.
 function toJsonInput(layout: TicketTemplateLayout): Prisma.InputJsonValue {
   return layout as unknown as Prisma.InputJsonValue;
 }
@@ -15,18 +14,17 @@ function fromJsonValue(value: Prisma.JsonValue): TicketTemplateLayout {
   return value as unknown as TicketTemplateLayout;
 }
 
-// Listar todas las versiones (historial/auditoría) — solo admin
-ticketTemplatesRouter.get("/", async (_req, res) => {
+ticketTemplatesRouter.get("/", requireAuth, async (req, res) => {
   const templates = await prisma.ticketTemplate.findMany({
+    where: { companyId: req.user!.companyId },
     orderBy: { version: "desc" },
   });
   res.json(templates);
 });
 
-// Plantilla activa — la consume el componente de impresión (InvoiceTemplate)
-ticketTemplatesRouter.get("/active", async (_req, res) => {
+ticketTemplatesRouter.get("/active", requireAuth, async (req, res) => {
   const active = await prisma.ticketTemplate.findFirst({
-    where: { isActive: true },
+    where: { isActive: true, companyId: req.user!.companyId },
   });
 
   if (!active) {
@@ -36,8 +34,7 @@ ticketTemplatesRouter.get("/active", async (_req, res) => {
   res.json(active);
 });
 
-// Crear una nueva versión — queda inactiva hasta que se active explícitamente
-ticketTemplatesRouter.post("/", async (req, res) => {
+ticketTemplatesRouter.post("/", requireAuth, async (req, res) => {
   const { name, layout } = req.body as { name?: string; layout?: TicketTemplateLayout };
 
   if (!name || !layout) {
@@ -49,13 +46,17 @@ ticketTemplatesRouter.post("/", async (req, res) => {
     return res.status(400).json({ error: "Layout inválido", details: errors });
   }
 
-  const last = await prisma.ticketTemplate.findFirst({ orderBy: { version: "desc" } });
+  const last = await prisma.ticketTemplate.findFirst({
+    where: { companyId: req.user!.companyId },
+    orderBy: { version: "desc" },
+  });
 
   const template = await prisma.ticketTemplate.create({
     data: {
       name,
       layout: toJsonInput(layout),
       version: (last?.version ?? 0) + 1,
+      companyId: req.user!.companyId,
       isActive: false,
     },
   });
@@ -63,11 +64,12 @@ ticketTemplatesRouter.post("/", async (req, res) => {
   res.status(201).json(template);
 });
 
-// Activar una versión — desactiva cualquier otra en una sola transacción
-ticketTemplatesRouter.patch("/:id/activate", async (req, res) => {
+ticketTemplatesRouter.patch("/:id/activate", requireAuth, async (req, res) => {
   const id = String(req.params.id);
 
-  const target = await prisma.ticketTemplate.findUnique({ where: { id } });
+  const target = await prisma.ticketTemplate.findFirst({
+    where: { id, companyId: req.user!.companyId },
+  });
   if (!target) {
     return res.status(404).json({ error: "Plantilla no encontrada" });
   }
@@ -82,7 +84,7 @@ ticketTemplatesRouter.patch("/:id/activate", async (req, res) => {
 
   const [, activated] = await prisma.$transaction([
     prisma.ticketTemplate.updateMany({
-      where: { isActive: true },
+      where: { isActive: true, companyId: req.user!.companyId },
       data: { isActive: false },
     }),
     prisma.ticketTemplate.update({
@@ -94,13 +96,13 @@ ticketTemplatesRouter.patch("/:id/activate", async (req, res) => {
   res.json(activated);
 });
 
-// Editar una versión que AÚN no está activa
-// (si ya está activa y en uso, se prefiere crear una versión nueva para no perder el historial de auditoría)
-ticketTemplatesRouter.patch("/:id", async (req, res) => {
+ticketTemplatesRouter.patch("/:id", requireAuth, async (req, res) => {
   const id = String(req.params.id);
   const { name, layout } = req.body as { name?: string; layout?: TicketTemplateLayout };
 
-  const existing = await prisma.ticketTemplate.findUnique({ where: { id } });
+  const existing = await prisma.ticketTemplate.findFirst({
+    where: { id, companyId: req.user!.companyId },
+  });
   if (!existing) {
     return res.status(404).json({ error: "Plantilla no encontrada" });
   }

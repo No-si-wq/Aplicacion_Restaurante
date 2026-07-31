@@ -5,6 +5,7 @@ export interface AuthPayload {
   id: string;
   username: string;
   role: "ADMIN" | "VENDEDOR";
+  companyId: string;
 }
 
 declare global {

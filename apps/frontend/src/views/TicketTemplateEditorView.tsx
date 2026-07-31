@@ -344,7 +344,7 @@ export function TicketTemplateEditorView() {
             <button
               type="button"
               disabled={saving}
-              className="bg-terracotta-600 text-white rounded px-4 py-2 disabled:opacity-50"
+              className="bg-orange-600 text-white rounded px-4 py-2 disabled:opacity-50"
               onClick={handleSaveAsNew}
             >
               Guardar como nueva versión

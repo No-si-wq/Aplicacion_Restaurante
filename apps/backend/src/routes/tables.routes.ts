@@ -2,8 +2,7 @@
 import { Router } from "express";
 import { prisma } from "../db/client";
 import type { Server } from "socket.io";
-import { emitOrderUpdated } from "../socket/orderEvents";
-import { toOrderStatus, toSharedOrder } from "./orders.routes";
+import { toSharedOrder } from "./orders.routes";
 import { emitOrdersBilled } from "../socket/orderEvents";
 import { requireAuth } from "../middleware/auth.middleware";
 
@@ -11,9 +10,10 @@ export function tablesRouter(io: Server): Router {
   const router = Router();
 
   // GET /tables — listar todas
-  router.get("/", async (req, res) => {
+  router.get("/", requireAuth, async (req, res) => {
     try {
       const tables = await prisma.table.findMany({
+        where: { companyId: req.user!.companyId },
         orderBy: { number: "asc" },
       });
       res.json(tables);
@@ -23,7 +23,7 @@ export function tablesRouter(io: Server): Router {
   });
 
   // POST /tables — crear mesa
-  router.post("/", async (req, res) => {
+  router.post("/", requireAuth, async (req, res) => {
     const { number, label } = req.body;
 
     if (!number || !label) {
@@ -31,13 +31,13 @@ export function tablesRouter(io: Server): Router {
     }
 
     try {
-      const existing = await prisma.table.findFirst({ where: { number } });
+      const existing = await prisma.table.findFirst({ where: { number, companyId: req.user!.companyId } });
       if (existing) {
         return res.status(409).json({ error: `La mesa ${number} ya existe` });
       }
 
       const table = await prisma.table.create({
-        data: { number, label, status: "free" },
+        data: { number, label, status: "free", companyId: req.user!.companyId },
       });
       res.status(201).json(table);
     } catch (error) {
@@ -46,8 +46,9 @@ export function tablesRouter(io: Server): Router {
   });
 
   // PATCH /tables/reservations/:reservationId/status — confirmar o cancelar
-  router.patch("/reservations/:reservationId/status", async (req, res) => {
+  router.patch("/reservations/:reservationId/status", requireAuth, async (req, res) => {
     const { status } = req.body;
+    const reservationId = String(req.params.reservationId);
     const validStatuses = ["pending", "confirmed", "cancelled"];
 
     if (!validStatuses.includes(status)) {
@@ -55,10 +56,21 @@ export function tablesRouter(io: Server): Router {
     }
 
     try {
-      const reservation = await prisma.reservation.update({
-        where: { id: req.params.reservationId },
+      const result = await prisma.reservation.updateMany({
+        where: { 
+          id: reservationId,
+          table: { companyId: req.user!.companyId },
+        },
         data: { status },
       });
+
+    if (result.count === 0) {
+      return res.status(404).json({ error: "Reserva no encontrada" });
+    }
+
+    const reservation = await prisma.reservation.findUnique({
+      where: { id: reservationId },
+    });
       res.json(reservation);
     } catch (error) {
       res.status(500).json({ error: "Error al actualizar la reserva" });
@@ -78,7 +90,7 @@ export function tablesRouter(io: Server): Router {
     try {
       if (status === "billed") {
         const activeOrders = await prisma.order.findMany({
-          where: { tableId, invoiceNumber: null },
+          where: { tableId, invoiceNumber: null, companyId: req.user!.companyId },
         });
 
         if (activeOrders.length === 0) {
@@ -89,7 +101,12 @@ export function tablesRouter(io: Server): Router {
 
         const result = await prisma.$transaction(async (tx) => {
           const cai = await tx.cai.findFirst({
-            where: { userId, isActive: true, limitDate: { gte: new Date() } },
+            where: { 
+              userId, 
+              companyId: req.user!.companyId,
+              isActive: true, 
+              limitDate: { gte: new Date() },
+            },
           });
 
           if (!cai) throw new Error("NO_CAI");
@@ -104,7 +121,7 @@ export function tablesRouter(io: Server): Router {
 
           await tx.order.updateMany({
             where: { id: { in: activeOrders.map((o) => o.id) } },
-            data: { caiId: cai.id, invoiceNumber: nextNumber },
+            data: { caiId: cai.id, invoiceNumber: nextNumber, status: "delivered" },
           });
 
           const table = await tx.table.update({
@@ -127,10 +144,15 @@ export function tablesRouter(io: Server): Router {
 
         return res.json(result);
       }
-      const table = await prisma.table.update({
-        where: { id: tableId },
+
+      const result = await prisma.table.updateMany({
+        where: { id: tableId, companyId: req.user!.companyId },
         data: { status },
       });
+      if (result.count === 0) {
+        return res.status(404).json({ error: "Mesa no encontrada" });
+      }
+      const table = await prisma.table.findUnique({ where: { id: tableId } });
       res.json(table);
     } catch (error) {
       if (error instanceof Error && error.message === "NO_CAI") {
@@ -144,10 +166,11 @@ export function tablesRouter(io: Server): Router {
   });
 
   // GET /tables/:id/reservations — listar reservas de una mesa
-  router.get("/:id/reservations", async (req, res) => {
+  router.get("/:id/reservations", requireAuth, async (req, res) => {
+    const tableId = String(req.params.id);
     try {
       const reservations = await prisma.reservation.findMany({
-        where: { tableId: req.params.id },
+        where: { tableId, table: { companyId: req.user!.companyId } },
         orderBy: { date: "asc" },
       });
       res.json(reservations);
@@ -157,15 +180,18 @@ export function tablesRouter(io: Server): Router {
   });
 
   // POST /tables/:id/reservations — crear reserva
-  router.post("/:id/reservations", async (req, res) => {
+  router.post("/:id/reservations", requireAuth, async (req, res) => {
     const { name, date, partySize, notes } = req.body;
+    const tableId = String(req.params.id);
 
     if (!name || !date || !partySize) {
       return res.status(400).json({ error: "name, date y partySize son requeridos" });
     }
 
     try {
-      const table = await prisma.table.findUnique({ where: { id: req.params.id } });
+      const table = await prisma.table.findFirst({ 
+        where: { id: tableId, companyId: req.user!.companyId }, 
+      });
       if (!table) {
         return res.status(404).json({ error: "Mesa no encontrada" });
       }
@@ -174,7 +200,7 @@ export function tablesRouter(io: Server): Router {
       const reservationDate = new Date(date);
       const conflict = await prisma.reservation.findFirst({
         where: {
-          tableId: req.params.id,
+          tableId,
           status: { not: "cancelled" },
           date: {
             gte: new Date(reservationDate.getTime() - 2 * 60 * 60 * 1000),
@@ -188,7 +214,7 @@ export function tablesRouter(io: Server): Router {
       }
 
       const reservation = await prisma.reservation.create({
-        data: { tableId: req.params.id, name, date: reservationDate, partySize, notes },
+        data: { tableId, name, date: reservationDate, partySize, notes },
       });
 
       res.status(201).json(reservation);
@@ -198,11 +224,12 @@ export function tablesRouter(io: Server): Router {
   });
 
   // DELETE /tables/:id
-  router.delete("/:id", async (req, res) => {
+  router.delete("/:id", requireAuth, async (req, res) => {
+    const tableId = String(req.params.id);
     try {
       const activeOrders = await prisma.order.count({
         where: {
-          tableId: req.params.id,
+          tableId,
           invoiceNumber: null,
         },
       });
@@ -213,7 +240,9 @@ export function tablesRouter(io: Server): Router {
         });
       }
 
-      await prisma.table.delete({ where: { id: req.params.id } });
+      await prisma.table.delete({ 
+        where: { id: tableId, companyId: req.user!.companyId }, 
+      });
       res.status(204).send();
     } catch (error) {
       res.status(500).json({ error: "Error al eliminar la mesa" });

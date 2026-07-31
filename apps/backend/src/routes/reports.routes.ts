@@ -1,11 +1,12 @@
 // apps/backend/src/routes/reports.routes.ts
 import { Router, Request, Response } from "express";
 import { prisma } from "../db/client";
+import { requireAuth } from "../middleware/auth.middleware";
 
 const router = Router();
 
 // GET /api/reports/sales?from=2026-01-01&to=2026-01-31
-router.get("/sales", async (req: Request, res: Response) => {
+router.get("/sales", requireAuth, async (req: Request, res: Response) => {
   const { from, to } = req.query;
 
   if (!from || !to) {
@@ -19,6 +20,7 @@ router.get("/sales", async (req: Request, res: Response) => {
   const orders = await prisma.order.findMany({
     where: {
       createdAt: { gte: fromDate, lte: toDate },
+      companyId: req.user!.companyId,
       status: { in: ["completed", "delivered"] },
       invoiceNumber: { not: null },
     },
@@ -83,7 +85,7 @@ router.get("/sales", async (req: Request, res: Response) => {
 });
 
 // GET /api/reports/products?from=2026-01-01&to=2026-01-31
-router.get("/products", async (req: Request, res: Response) => {
+router.get("/products", requireAuth, async (req: Request, res: Response) => {
   const { from, to } = req.query;
 
   if (!from || !to) {
@@ -97,6 +99,7 @@ router.get("/products", async (req: Request, res: Response) => {
   const orders = await prisma.order.findMany({
     where: {
       createdAt: { gte: fromDate, lte: toDate },
+      companyId: req.user!.companyId,
       status: { in: ["completed", "delivered"] },
       invoiceNumber: { not: null },
     },

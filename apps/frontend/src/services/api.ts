@@ -142,6 +142,28 @@ export function deleteOrder(id: string): Promise<void> {
   return request(`/orders/${id}`, { method: "DELETE" });
 }
 
+export interface Invoice {
+  caiId: string;
+  invoiceNumber: number;
+  formattedNumber: string;
+  table: Table;
+  billedAt: string;
+  orders: Order[];
+  total: number;
+}
+
+export function getInvoices(filters?: {
+  from?: string;
+  to?: string;
+  search?: string;
+}): Promise<Invoice[]> {
+  const params = new URLSearchParams(
+    Object.entries(filters ?? {}).filter(([, v]) => v !== undefined) as [string, string][]
+  );
+  const query = params.size > 0 ? `?${params}` : "";
+  return request(`/orders/invoices${query}`);
+}
+
 // ─── Categorías ───────────────────────────────────────────
 export async function getCategories(): Promise<Category[]> {
   return request("/categories");

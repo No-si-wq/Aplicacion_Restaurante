@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
 export default function LoginView() {
+  const [companySlug, setCompanySlug] = useState("");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -15,7 +16,7 @@ export default function LoginView() {
     setError("");
     setLoading(true);
     try {
-      await login(username, password);
+      await login(companySlug, username, password);
       navigate("/sala");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al iniciar sesión");
@@ -31,9 +32,14 @@ export default function LoginView() {
         <p className="text-sm text-gray-500 text-center mb-6">Inicia sesión para continuar</p>
         <form onSubmit={handleSubmit} className="space-y-3">
           <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Empresa</label>
+            <input value={companySlug} onChange={(e) => setCompanySlug(e.target.value)}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-gray-400" autoFocus />
+          </div>
+          <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">Usuario</label>
             <input value={username} onChange={(e) => setUsername(e.target.value)}
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-gray-400" autoFocus />
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-gray-400" />
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">Contraseña</label>

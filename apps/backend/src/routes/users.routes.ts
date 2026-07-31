@@ -1,12 +1,14 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
 import { prisma } from "../db/client";
+import { requireAuth } from "../middleware/auth.middleware";
 
 export const router = Router();
 
 // GET /api/users
-router.get("/", async (_req, res) => {
+router.get("/", requireAuth, async (req, res) => {
   const users = await prisma.user.findMany({
+    where: { companyId: req.user!.companyId },
     select: { id: true, username: true, role: true, createdAt: true },
     orderBy: { createdAt: "desc" },
   });
@@ -14,21 +16,22 @@ router.get("/", async (_req, res) => {
 });
 
 // POST /api/users
-router.post("/", async (req, res) => {
+router.post("/", requireAuth, async (req, res) => {
   const { username, password, role } = req.body;
+  const companyId = req.user!.companyId;
 
   if (!username || !password) {
     return res.status(400).json({ error: "username y password son requeridos" });
   }
 
-  const exists = await prisma.user.findUnique({ where: { username } });
+  const exists = await prisma.user.findFirst({ where: { username, companyId } });
   if (exists) {
     return res.status(409).json({ error: "El nombre de usuario ya existe" });
   }
 
   const hashed = await bcrypt.hash(password, 10);
   const user = await prisma.user.create({
-    data: { username, password: hashed, role: role ?? "VENDEDOR" },
+    data: { username, password: hashed, role: role ?? "VENDEDOR", companyId },
     select: { id: true, username: true, role: true, createdAt: true },
   });
 
@@ -36,9 +39,10 @@ router.post("/", async (req, res) => {
 });
 
 // PUT /api/users/:id
-router.put("/:id", async (req, res) => {
-  const { id } = req.params;
+router.put("/:id", requireAuth, async (req, res) => {
+  const id = String(req.params.id);
   const { username, password, role } = req.body;
+  const companyId = req.user!.companyId;
 
   const data: any = {};
   if (username) data.username = username;
@@ -46,9 +50,17 @@ router.put("/:id", async (req, res) => {
   if (password) data.password = await bcrypt.hash(password, 10);
 
   try {
-    const user = await prisma.user.update({
-      where: { id },
+    const result = await prisma.user.updateMany({
+      where: { id, companyId },
       data,
+    });
+
+    if (result.count === 0) {
+      return res.status(404).json({ error: "Usuario no encontrado" });
+    }
+
+    const user = await prisma.user.findUniqueOrThrow({
+      where: { id },
       select: { id: true, username: true, role: true, createdAt: true },
     });
     res.json(user);
@@ -58,11 +70,12 @@ router.put("/:id", async (req, res) => {
 });
 
 // DELETE /api/users/:id
-router.delete("/:id", async (req, res) => {
-  const { id } = req.params;
+router.delete("/:id", requireAuth, async (req, res) => {
+  const id = String(req.params.id);
+  const companyId = req.user!.companyId;
 
   try {
-    await prisma.user.delete({ where: { id } });
+    await prisma.user.delete({ where: { id, companyId } });
     res.status(204).send();
   } catch {
     res.status(404).json({ error: "Usuario no encontrado" });

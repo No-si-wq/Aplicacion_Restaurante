@@ -1,13 +1,15 @@
 // routes/categories.routes.ts
 import { Router } from "express";
 import { prisma } from "../db/client";
+import { requireAuth } from "../middleware/auth.middleware";
 
 const router = Router();
 
 // GET /categories
-router.get("/", async (_req, res) => {
+router.get("/", requireAuth, async (req, res) => {
   try {
-    const categories = await prisma.category.findMany({
+    const categories = await prisma.category.findMany({ 
+      where: { companyId: req.user!.companyId },
       orderBy: { name: "asc" },
     });
     res.json(categories);
@@ -17,7 +19,7 @@ router.get("/", async (_req, res) => {
 });
 
 // POST /categories
-router.post("/", async (req, res) => {
+router.post("/", requireAuth, async (req, res) => {
   const { name } = req.body;
   if (!name?.trim()) {
     res.status(400).json({ error: "El nombre es requerido" });
@@ -25,7 +27,7 @@ router.post("/", async (req, res) => {
   }
   try {
     const category = await prisma.category.create({
-      data: { name: name.trim() },
+      data: { name: name.trim(), companyId: req.user!.companyId },
     });
     res.status(201).json(category);
   } catch (e: any) {
@@ -38,9 +40,10 @@ router.post("/", async (req, res) => {
 });
 
 // DELETE /categories/:id
-router.delete("/:id", async (req, res) => {
+router.delete("/:id", requireAuth, async (req, res) => {
+  const categoryId = String(req.params.id);
   try {
-    await prisma.category.delete({ where: { id: req.params.id } });
+    await prisma.category.delete({ where: { id: categoryId, companyId: req.user!.companyId } });
     res.status(204).send();
   } catch {
     res.status(500).json({ error: "Error al eliminar categoría" });
