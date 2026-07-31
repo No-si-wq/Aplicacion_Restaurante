@@ -1,10 +1,12 @@
 // views/SalaView.tsx
 import { useEffect, useState } from "react";
-import { getTables, getProducts, createOrder } from "../services/api";
+import { getTables, getProducts, createOrder, billTable, updateTableStatus } from "../services/api";
 import { useOrders } from "../hooks/useOrders";
 import StatusBadge from "../components/StatusBadge";
+import { InvoiceTemplate } from "../components/InvoiceTemplate";
 import { mergeItems } from "../utils/mergeItems";
 import type { Table, Product } from "@restaurante/types";
+import type { Order } from "@restaurante/types";
 
 interface CartItem {
   product: Product;
@@ -25,6 +27,8 @@ export default function SalaView() {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   // NUEVO: controla el paso activo en móvil/tablet
   const [mobileStep, setMobileStep] = useState<MobileStep>("tables");
+  const [billing, setBilling] = useState(false);
+  const [billedOrders, setBilledOrders] = useState<Order[] | null>(null);
 
   const { orders, isConnected } = useOrders();
 
@@ -37,7 +41,7 @@ export default function SalaView() {
     setTables((prev) =>
       prev.map((t) => {
         const hasActive = orders.some(
-          (o) => o.tableId === t.id && o.status !== "delivered"
+          (o) => o.tableId === t.id && !o.invoiceNumber
         );
         return hasActive && t.status === "free"
           ? { ...t, status: "occupied" }
@@ -48,7 +52,7 @@ export default function SalaView() {
 
   const activeOrders = selectedTable
     ? orders.filter(
-        (o) => o.tableId === selectedTable.id && o.status !== "delivered"
+        (o) => o.tableId === selectedTable.id && !o.invoiceNumber
       )
     : [];
 
@@ -133,6 +137,20 @@ export default function SalaView() {
     (acc, i) => acc + Number(i.product.price) * i.quantity,
     0
   );
+
+  async function handleBillTable() {
+    if (!selectedTable) return;
+    setBilling(true);
+    setFeedback(null);
+    try {
+      const result = await billTable(selectedTable.id);
+      setBilledOrders(result.orders);
+    } catch {
+      setFeedback("Error al facturar la mesa (verifica el CAI del usuario)");
+    } finally {
+      setBilling(false);
+    }
+  }
 
   // ─── Secciones reutilizables ──────────────────────────────────────────────
 
@@ -286,6 +304,17 @@ export default function SalaView() {
                 L. {activeOrdersTotal.toFixed(2)}
               </span>
             </div>
+            <button
+              onClick={handleBillTable}
+              disabled={billing}
+              className={`w-full mt-3 py-2.5 rounded-lg text-sm font-medium transition-opacity ${
+                billing
+                  ? "opacity-50 cursor-not-allowed bg-terracota-50 text-terracota-700"
+                  : "bg-terracota-50 text-terracota-700 hover:bg-terracota-100"
+              }`}
+            >
+              {billing ? "Facturando..." : "Facturar mesa"}
+            </button>
           </div>
         </div>
       )}
@@ -467,6 +496,28 @@ export default function SalaView() {
           </div>
         )}
       </div>
+
+      {billedOrders && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4 print:bg-transparent print:p-0 print:static">
+          <div className="bg-white rounded-xl p-4 max-h-[90vh] overflow-y-auto print:rounded-none print:max-h-none print:overflow-visible">
+          <button
+            onClick={async () => {
+              if (selectedTable) {
+                await updateTableStatus(selectedTable.id, "free");
+              }
+              setBilledOrders(null);
+              setSelectedTable(null);
+              setMobileStep("tables");
+              getTables().then(setTables);
+            }}
+            className="text-xs text-gray-400 hover:text-gray-600 mb-2 print:hidden"
+          >
+            ← Cerrar
+          </button>
+            <InvoiceTemplate orders={billedOrders} />
+          </div>
+        </div>
+      )}
 
     </div>
   );

@@ -2,6 +2,17 @@ export type OrderStatus = "pending" | "in_progress" | "ready" | "delivered";
 export type TableStatus = "free" | "occupied" | "billed" | "reserved";
 export type ReservationStatus = "pending" | "confirmed" | "cancelled";
 
+export interface Cai {
+  id: string;
+  code: string;
+  establishment: string;
+  pointOfSale: string;
+  documentType: string;
+  rangeStart: number;
+  rangeEnd: number;
+  limitDate: string;
+}
+
 export interface Reservation {
   id: string;
   tableId: string;
@@ -53,4 +64,23 @@ export interface Order {
   updatedAt: string;
   table: Table;
   items: OrderItem[];
+  invoiceNumber?: number;
+  cai?: Cai;
+}
+
+// apps/frontend/src/types/cai.admin.ts
+export interface CaiAdmin {
+  id: string;
+  code: string;
+  establishment: string;
+  pointOfSale: string;
+  documentType: string;
+  rangeStart: number;
+  rangeEnd: number;
+  currentNumber: number;
+  limitDate: string;
+  isActive: boolean;
+  userId: string;
+  user: { id: string; username: string };
+  createdAt: string;
 }

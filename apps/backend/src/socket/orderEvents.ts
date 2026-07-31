@@ -21,3 +21,7 @@ export function emitOrderUpdated(
 ): void {
   io.emit("order:updated", updated);
 }
+
+export function emitOrdersBilled(io: Server, orderIds: string[]): void {
+  io.emit("order:billed", orderIds);
+}

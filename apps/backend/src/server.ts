@@ -10,7 +10,9 @@ import { productsRouter } from "./routes/products.routes";
 import categoriesRouter from "./routes/categories.routes";
 import reportsRouter from "./routes/reports.routes";
 import authRouter from "./routes/auth.routes";
-import usersRouter from "./routes/users.routes"
+import usersRouter from "./routes/users.routes";
+import { caiRouter } from "./routes/cai.routes";
+import { ticketTemplatesRouter } from "./routes/ticketTemplates.routes";
 
 const app = express();
 const httpServer = createServer(app);
@@ -35,12 +37,14 @@ const io = new Server(httpServer, {
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 app.use("/api/orders", ordersRouter(io));
-app.use("/api/tables", tablesRouter);
+app.use("/api/tables", tablesRouter(io));
 app.use("/api/products", productsRouter);
 app.use("/api/categories", categoriesRouter);
 app.use("/api/reports", reportsRouter);
 app.use("/api/auth", authRouter);
 app.use("/api/users", usersRouter);
+app.use("/api/cai", caiRouter);
+app.use("/api/ticket-templates", ticketTemplatesRouter);
 
 io.on("connection", (socket) => {
   console.log(`[socket] Cliente conectado: ${socket.id}`);

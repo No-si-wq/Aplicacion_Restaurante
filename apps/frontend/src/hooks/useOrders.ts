@@ -16,9 +16,9 @@ export function useOrders(): UseOrdersReturn {
 
   useEffect(() => {
     // 1. Cargar órdenes activas al montar
-    fetch(`${API_BASE}/api/orders?status=pending,in_progress,ready`)
+    fetch(`${API_BASE}/api/orders?status=pending,in_progress,ready,delivered`)
       .then((r) => r.json())
-      .then(setOrders);
+      .then((data: Order[]) => setOrders(data.filter((o) => !o.invoiceNumber)));
 
     // 2. Conectar al servidor WebSocket
     const socket = io(import.meta.env.VITE_API_URL, {
@@ -50,12 +50,15 @@ export function useOrders(): UseOrdersReturn {
     // 4. Orden actualizada — reemplazar en el estado
     socket.on("order:updated", (updated: Pick<Order, "id" | "status">) => {
       setOrders((prev) =>
-        updated.status === "delivered"
-          ? prev.filter((o) => o.id !== updated.id)
-          : prev.map((o) =>
-              o.id === updated.id ? { ...o, status: updated.status } : o
-            )
+        prev.map((o) =>
+          o.id === updated.id ? { ...o, status: updated.status } : o
+        )
       );
+    });
+
+    // 6. Órdenes facturadas — retirarlas del estado en todos los clientes
+    socket.on("order:billed", (orderIds: string[]) => {
+      setOrders((prev) => prev.filter((o) => !orderIds.includes(o.id)));
     });
 
     // 5. Limpiar al desmontar el componente

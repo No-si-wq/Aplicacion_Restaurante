@@ -2,7 +2,7 @@ import { Router } from "express";
 import { prisma } from "../db/client";
 import { emitOrderNew, emitOrderUpdated } from "../socket/orderEvents";
 import type { Server } from "socket.io";
-import type { Order, OrderStatus, TableStatus } from "@restaurante/types";
+import type { Order, OrderStatus, TableStatus, Cai } from "@restaurante/types";
 import type { Prisma } from "@prisma/client";
 
 const ORDER_STATUSES: OrderStatus[] = ["pending", "in_progress", "ready", "delivered"];
@@ -12,7 +12,7 @@ function isOrderStatus(value: unknown): value is OrderStatus {
   return typeof value === "string" && ORDER_STATUSES.includes(value as OrderStatus);
 }
 
-function toOrderStatus(value: string): OrderStatus {
+export function toOrderStatus(value: string): OrderStatus {
   if (!isOrderStatus(value)) {
     throw new Error(`Unexpected order status: ${value}`);
   }
@@ -32,11 +32,12 @@ type PrismaOrderWithRelations = Prisma.OrderGetPayload<{
   include: {
     items: { include: { product: { include: { category: true } } } };
     table: true;
+    cai: true;
   };
 }>;
 
-function toSharedOrder(order: PrismaOrderWithRelations): Order {
-  return {
+export function toSharedOrder(order: PrismaOrderWithRelations): Order {
+  const shared: Order = {
     id: order.id,
     tableId: order.tableId,
     status: toOrderStatus(order.status),
@@ -85,6 +86,26 @@ function toSharedOrder(order: PrismaOrderWithRelations): Order {
       return mappedItem;
     }),
   };
+
+  if (order.invoiceNumber !== null) {
+    shared.invoiceNumber = order.invoiceNumber;
+  }
+
+  if (order.cai !== null) {
+    const cai: Cai = {
+      id: order.cai.id,
+      code: order.cai.code,
+      establishment: order.cai.establishment,
+      pointOfSale: order.cai.pointOfSale,
+      documentType: order.cai.documentType,
+      rangeStart: order.cai.rangeStart,
+      rangeEnd: order.cai.rangeEnd,
+      limitDate: order.cai.limitDate.toISOString(),
+    };
+    shared.cai = cai;
+  }
+
+  return shared;
 }
 
 export function ordersRouter(io: Server): Router {
@@ -104,6 +125,7 @@ export function ordersRouter(io: Server): Router {
         include: {
           items: { include: { product: { include: { category: true } } } },
           table: true,
+          cai: true,
         },
         orderBy: { createdAt: "asc" },
       } satisfies Prisma.OrderFindManyArgs;
@@ -137,6 +159,7 @@ export function ordersRouter(io: Server): Router {
         include: {
           items: { include: { product: { include: { category: true } } } },
           table: true,
+          cai: true,
         },
       });
 
@@ -198,6 +221,7 @@ export function ordersRouter(io: Server): Router {
         include: {
           items: { include: { product: { include: { category: true } } } },
           table: true,
+          cai: true,
         },
       });
       res.json(toSharedOrder(fullOrder));

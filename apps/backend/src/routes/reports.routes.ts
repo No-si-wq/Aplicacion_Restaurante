@@ -20,6 +20,7 @@ router.get("/sales", async (req: Request, res: Response) => {
     where: {
       createdAt: { gte: fromDate, lte: toDate },
       status: { in: ["completed", "delivered"] },
+      invoiceNumber: { not: null },
     },
     include: {
       table: true,
@@ -47,7 +48,7 @@ router.get("/sales", async (req: Request, res: Response) => {
     if (!dayMap[dayKey]) dayMap[dayKey] = { date: dayKey, orders: [] };
 
     dayMap[dayKey].orders.push({
-      invoiceNumber: order.invoiceNumber,
+      invoiceNumber: order.invoiceNumber!,
       tableLabel: order.table.label,
       importe: Number(importe.toFixed(2)),
       isv,
@@ -97,6 +98,7 @@ router.get("/products", async (req: Request, res: Response) => {
     where: {
       createdAt: { gte: fromDate, lte: toDate },
       status: { in: ["completed", "delivered"] },
+      invoiceNumber: { not: null },
     },
     include: {
       items: { include: { product: { include: { category: true } } } },

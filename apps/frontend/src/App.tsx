@@ -1,4 +1,5 @@
 // App.tsx
+import { useState, useEffect } from "react";
 import { BrowserRouter, Routes, Route, NavLink, Navigate, useLocation } from "react-router-dom";
 import SalaView from "./views/SalaView";
 import CocinaView from "./views/CocinaView";
@@ -7,6 +8,7 @@ import AdminGuard from "./components/AdminGuard";
 import ReportsView from "./views/ReportsView";
 import UserManager from "./components/UserManager";
 import LoginView from "./views/LoginView";
+import { TicketTemplateEditorView } from "./views/TicketTemplateEditorView";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 
 export default function App() {
@@ -23,6 +25,12 @@ function AppContent() {
   const { user, logout } = useAuth();
   const location = useLocation();
   const isLoginPage = location.pathname === "/login";
+  const [showMore, setShowMore] = useState(false);
+
+  useEffect(() => {
+    setShowMore(false);
+  }, [location.pathname]);
+
   return (
     <div className="min-h-screen bg-gray-50 pb-16 sm:pb-0">
 
@@ -104,6 +112,21 @@ function AppContent() {
               </NavLink>
             )}
 
+            {user?.role === "ADMIN" && (
+              <NavLink
+                to="/formato-ticket"
+                className={({ isActive }) =>
+                  `text-xs px-3 py-1.5 rounded-lg border transition-colors ${
+                    isActive
+                      ? "border-gray-800 text-gray-900 bg-gray-100"
+                      : "border-gray-200 text-gray-400 hover:text-gray-600 hover:border-gray-300"
+                  }`
+                }
+              >
+                Formato ticket
+              </NavLink>
+            )}
+
             <button
               onClick={logout}
               className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-400 hover:text-gray-600 hover:border-gray-300"
@@ -157,6 +180,14 @@ function AppContent() {
             </AdminGuard>
           }
         />
+        <Route
+          path="/formato-ticket"
+          element={
+            <AdminGuard>
+              <TicketTemplateEditorView />
+            </AdminGuard>
+          }
+        />
         <Route path="*" element={<Navigate to="/sala" replace />} />
       </Routes>
       
@@ -203,24 +234,67 @@ function AppContent() {
                   </svg>
                 ),
               },
+              {
+                to: "__more__",
+                label: "Más",
+                icon: (
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 12a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0ZM12.75 12a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0ZM18.75 12a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Z" />
+                  </svg>
+                ),
+              },
           ] as { to: string; label: string; icon: React.ReactNode }[]
         )
-          .filter((tab) => user?.role === "ADMIN" || (tab.to !== "/reportes" && tab.to !== "/admin"))
+          .filter((tab) => user?.role === "ADMIN" || (tab.to !== "/reportes" && tab.to !== "/admin" && tab.to !== "__more__"))
           .map(({ to, label, icon }) => (
-            <NavLink
-              key={to}
-              to={to}
-              className={({ isActive }) =>
-                `flex-1 flex flex-col items-center justify-center gap-0.5 py-2 text-xs font-medium transition-colors ${
-                  isActive ? "text-gray-900" : "text-gray-400 hover:text-gray-600"
-                }`
-              }
-            >
-              {icon}
-              {label}
-            </NavLink>
+            to === "__more__" ? (
+              <button
+                key={to}
+                type="button"
+                onClick={() => setShowMore((v) => !v)}
+                className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-2 text-xs font-medium transition-colors ${
+                  showMore ? "text-gray-900" : "text-gray-400 hover:text-gray-600"
+                }`}
+              >
+                {icon}
+                {label}
+              </button>
+            ) : (
+              <NavLink
+                key={to}
+                to={to}
+                className={({ isActive }) =>
+                  `flex-1 flex flex-col items-center justify-center gap-0.5 py-2 text-xs font-medium transition-colors ${
+                    isActive ? "text-gray-900" : "text-gray-400 hover:text-gray-600"
+                  }`
+                }
+              >
+                {icon}
+                {label}
+              </NavLink>
+            )
           ))}
         </nav>
+      )}
+
+      {/* Panel "Más" — accesos admin secundarios, solo móvil */}
+      {!isLoginPage && showMore && user?.role === "ADMIN" && (
+        <div className="sm:hidden fixed bottom-14 inset-x-0 bg-white border-t border-gray-200 shadow-lg z-40 p-2">
+          <NavLink
+            to="/usuarios"
+            onClick={() => setShowMore(false)}
+            className="block px-4 py-3 text-sm font-medium text-gray-700 rounded-lg hover:bg-gray-100"
+          >
+            Usuarios
+          </NavLink>
+          <NavLink
+            to="/formato-ticket"
+            onClick={() => setShowMore(false)}
+            className="block px-4 py-3 text-sm font-medium text-gray-700 rounded-lg hover:bg-gray-100"
+          >
+            Formato ticket
+          </NavLink>
+        </div>
       )}
 
     </div>

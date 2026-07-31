@@ -1,6 +1,7 @@
-import type { Order, Table, Product, Reservation, ReservationStatus, Category } from "@restaurante/types";
+import type { Order, Table, Product, Reservation, ReservationStatus, Category, CaiAdmin, TicketTemplateLayout } from "@restaurante/types";
 
 const BASE_URL = import.meta.env.VITE_API_URL + "/api";
+export const getCais = () => request<CaiAdmin[]>("/cai");
 
 async function request<T>(
   path: string,
@@ -86,6 +87,12 @@ export function deleteUser(id: string): Promise<void> {
 export function getTables(): Promise<Table[]> {
   return request("/tables");
 }
+
+export const billTable = (tableId: string) =>
+  request<{ table: Table; orders: Order[] }>(`/tables/${tableId}/status`, {
+    method: "PATCH",
+    body: JSON.stringify({ status: "billed" }),
+  });
 
 export function updateTableStatus(
   id: string,
@@ -294,3 +301,56 @@ export interface ProductsSalesReport {
 export function getProductsReport(from: string, to: string): Promise<ProductsSalesReport> {
   return request(`/reports/products?from=${from}&to=${to}`);
 }
+
+export const createCai = (data: {
+  code: string;
+  establishment: string;
+  pointOfSale: string;
+  documentType?: string;
+  rangeStart: number;
+  rangeEnd: number;
+  limitDate: string;
+  userId: string;
+}) => request<CaiAdmin>("/cai", { method: "POST", body: JSON.stringify(data) });
+
+export const updateCai = (id: string, data: Partial<Pick<CaiAdmin, "isActive" | "limitDate" | "rangeEnd">>) =>
+  request<CaiAdmin>(`/cai/${id}`, { method: "PATCH", body: JSON.stringify(data) });
+
+export const deleteCai = (id: string) => request<void>(`/cai/${id}`, { method: "DELETE" });
+
+// Tipos de la plantilla de ticket (coincide con el modelo Prisma)
+export interface TicketTemplate {
+  id: string;
+  name: string;
+  version: number;
+  isActive: boolean;
+  layout: TicketTemplateLayout;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export const getTicketTemplates = () =>
+  request<TicketTemplate[]>("/ticket-templates");
+
+export const getActiveTicketTemplate = () =>
+  request<TicketTemplate>("/ticket-templates/active");
+
+export const createTicketTemplate = (name: string, layout: TicketTemplateLayout) =>
+  request<TicketTemplate>("/ticket-templates", {
+    method: "POST",
+    body: JSON.stringify({ name, layout }),
+  });
+
+export const updateTicketTemplate = (
+  id: string,
+  data: { name?: string; layout?: TicketTemplateLayout }
+) =>
+  request<TicketTemplate>(`/ticket-templates/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(data),
+  });
+
+export const activateTicketTemplate = (id: string) =>
+  request<TicketTemplate>(`/ticket-templates/${id}/activate`, {
+    method: "PATCH",
+  });

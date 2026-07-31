@@ -6,12 +6,30 @@ datasource db {
   provider = "postgresql"
 }
 
+model Cai {
+  id            String   @id @default(uuid())
+  code          String   @unique
+  establishment String
+  pointOfSale   String
+  documentType  String   @default("01")
+  rangeStart    Int
+  rangeEnd      Int
+  currentNumber Int      @default(0)
+  limitDate     DateTime
+  isActive      Boolean  @default(true)
+  userId        String
+  createdAt     DateTime @default(now())
+  user          User     @relation(fields: [userId], references: [id])
+  orders        Order[]
+}
+
 model User {
   id        String   @id @default(uuid())
   username  String   @unique
   password  String
   role      Role     @default(VENDEDOR)
   createdAt DateTime @default(now())
+  cais      Cai[]
 }
 
 model Reservation {
@@ -41,7 +59,9 @@ model Order {
   status        String      @default("pending")
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
-  invoiceNumber Int         @unique @default(autoincrement())
+  invoiceNumber Int?
+  caiId         String?
+  cai           Cai?        @relation(fields: [caiId], references: [id])
   table         Table       @relation(fields: [tableId], references: [id])
   items         OrderItem[]
 }
@@ -72,6 +92,16 @@ model Product {
   requiresKitchen Boolean     @default(true)
   items           OrderItem[]
   category        Category?   @relation(fields: [categoryId], references: [id])
+}
+
+model TicketTemplate {
+  id        String   @id @default(uuid())
+  name      String
+  version   Int      @default(1)
+  isActive  Boolean  @default(false)
+  layout    Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 enum Role {

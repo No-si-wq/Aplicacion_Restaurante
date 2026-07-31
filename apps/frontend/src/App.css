@@ -182,3 +182,22 @@
     border-right-color: var(--border);
   }
 }
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .print-receipt,
+  .print-receipt * {
+    visibility: visible;
+  }
+  .print-receipt {
+    position: absolute;
+    top: 0;
+    left: 0;
+  }
+  @page {
+    size: 80mm auto;
+    margin: 0;
+  }
+}
