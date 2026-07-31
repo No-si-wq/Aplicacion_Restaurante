@@ -1,7 +1,7 @@
 # Dependencias
 node_modules/
 **/node_modules/
-apps/backend/src/scripts/*
+apps/backend/src/scripts/datos.txt
 
 # Variables de entorno
 .env
