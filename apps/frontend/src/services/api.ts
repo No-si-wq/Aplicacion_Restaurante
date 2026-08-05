@@ -1,4 +1,7 @@
-import type { Order, Table, Product, Reservation, ReservationStatus, Category, CaiAdmin, TicketTemplateLayout } from "@restaurante/types";
+import type { 
+  Order, Table, Product, Reservation, ReservationStatus, 
+  Category, CaiAdmin, TicketTemplateLayout, Shift,
+} from "@restaurante/types";
 
 const BASE_URL = import.meta.env.VITE_API_URL + "/api";
 export const getCais = () => request<CaiAdmin[]>("/cai");
@@ -293,15 +296,21 @@ export interface DaySales {
   orders: DayOrder[];
   subtotal: { importe: number; isv: number; total: number };
 }
+
 export interface SalesReport {
-  from: string;
-  to: string;
+  from: string | null;
+  to: string | null;
+  shift: { name: string; openedAt: string; closedAt: string | null } | null; // NUEVO
   salesByDay: DaySales[];
   grandTotal: { importe: number; isv: number; total: number };
 }
 
 export function getSalesReport(from: string, to: string): Promise<SalesReport> {
   return request(`/reports/sales?from=${from}&to=${to}`);
+}
+
+export function getSalesReportByShift(shiftId: string): Promise<SalesReport> {
+  return request(`/reports/sales?shiftId=${shiftId}`);
 }
 
 export interface ProductReportItem {
@@ -313,15 +322,21 @@ export interface ProductReportItem {
   isv: number;
   total: number;
 }
+
 export interface ProductsSalesReport {
-  from: string;
-  to: string;
+  from: string | null;
+  to: string | null;
+  shift: { name: string; openedAt: string; closedAt: string | null } | null; // NUEVO
   products: ProductReportItem[];
   grandTotal: { quantity: number; importe: number; isv: number; total: number };
 }
 
 export function getProductsReport(from: string, to: string): Promise<ProductsSalesReport> {
   return request(`/reports/products?from=${from}&to=${to}`);
+}
+
+export function getProductsReportByShift(shiftId: string): Promise<ProductsSalesReport> {
+  return request(`/reports/products?shiftId=${shiftId}`);
 }
 
 export const createCai = (data: {
@@ -376,3 +391,19 @@ export const activateTicketTemplate = (id: string) =>
   request<TicketTemplate>(`/ticket-templates/${id}/activate`, {
     method: "PATCH",
   });
+
+// ─── Turnos ──────────────────────────────────────────────
+
+export const getCurrentShift = () => request<Shift | null>("/shifts/current");
+
+export const openShift = (userId: string) =>
+  request<Shift>("/shifts/open", { method: "POST", body: JSON.stringify({ userId }) });
+
+export const getNextShiftName = () => request<{ name: string }>("/shifts/next-name");
+
+export const getOpenShifts = () => request<Shift[]>("/shifts/open");
+
+export const closeShift = (id: string) =>
+  request<Shift>(`/shifts/${id}/close`, { method: "PATCH" });
+
+export const getShifts = () => request<Shift[]>("/shifts");

@@ -1,4 +1,5 @@
 // apps/backend/src/routes/reports.routes.ts
+import type { Prisma } from "@prisma/client";
 import { Router, Request, Response } from "express";
 import { prisma } from "../db/client";
 import { requireAuth } from "../middleware/auth.middleware";
@@ -7,27 +8,43 @@ const router = Router();
 
 // GET /api/reports/sales?from=2026-01-01&to=2026-01-31
 router.get("/sales", requireAuth, async (req: Request, res: Response) => {
-  const { from, to } = req.query;
+  const { from, to, shiftId } = req.query;
 
-  if (!from || !to) {
-    return res.status(400).json({ error: "Params 'from' and 'to' are required (YYYY-MM-DD)" });
+  if (!shiftId && (!from || !to)) {
+    return res.status(400).json({ error: "Indica 'shiftId' o ambos 'from' y 'to' (YYYY-MM-DD)" });
   }
 
-  const fromDate = new Date(`${from}T00:00:00.000Z`);
-  const toDate   = new Date(`${to}T23:59:59.999Z`);
   const ISV_RATE = 0.15;
 
+  const where: Prisma.OrderWhereInput = {
+    companyId: req.user!.companyId,
+    status: { in: ["delivered"] },
+    invoiceNumber: { not: null },
+  };
+
+  let shiftMeta: { name: string; openedAt: string; closedAt: string | null } | undefined;
+
+  if (shiftId) {
+    const shift = await prisma.shift.findFirst({
+      where: { id: String(shiftId), companyId: req.user!.companyId },
+    });
+    if (!shift) return res.status(404).json({ error: "Turno no encontrado" });
+    where.shiftId = shift.id;
+    shiftMeta = {
+      name: shift.name,
+      openedAt: shift.openedAt.toISOString(),
+      closedAt: shift.closedAt?.toISOString() ?? null,
+    };
+  } else {
+    where.createdAt = {
+      gte: new Date(`${from}T00:00:00.000Z`),
+      lte: new Date(`${to}T23:59:59.999Z`),
+    };
+  }
+
   const orders = await prisma.order.findMany({
-    where: {
-      createdAt: { gte: fromDate, lte: toDate },
-      companyId: req.user!.companyId,
-      status: { in: ["completed", "delivered"] },
-      invoiceNumber: { not: null },
-    },
-    include: {
-      table: true,
-      items: { include: { product: true } },
-    },
+    where,
+    include: { table: true, items: { include: { product: true } } },
     orderBy: { createdAt: "asc" },
   });
 
@@ -81,7 +98,7 @@ router.get("/sales", requireAuth, async (req: Request, res: Response) => {
     { importe: 0, isv: 0, total: 0 }
   );
 
-  res.json({ from, to, salesByDay, grandTotal });
+  res.json({ from: from ?? null, to: to ?? null, shift: shiftMeta ?? null, salesByDay, grandTotal });
 });
 
 // GET /api/reports/products?from=2026-01-01&to=2026-01-31
@@ -100,7 +117,7 @@ router.get("/products", requireAuth, async (req: Request, res: Response) => {
     where: {
       createdAt: { gte: fromDate, lte: toDate },
       companyId: req.user!.companyId,
-      status: { in: ["completed", "delivered"] },
+      status: { in: ["delivered"] },
       invoiceNumber: { not: null },
     },
     include: {

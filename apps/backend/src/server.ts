@@ -13,6 +13,7 @@ import authRouter from "./routes/auth.routes";
 import usersRouter from "./routes/users.routes";
 import { caiRouter } from "./routes/cai.routes";
 import { ticketTemplatesRouter } from "./routes/ticketTemplates.routes";
+import shiftsRoutes from "./routes/shifts.routes";
 
 const app = express();
 const httpServer = createServer(app);
@@ -45,6 +46,7 @@ app.use("/api/auth", authRouter);
 app.use("/api/users", usersRouter);
 app.use("/api/cai", caiRouter);
 app.use("/api/ticket-templates", ticketTemplatesRouter);
+app.use("/api/shifts", shiftsRoutes);
 
 io.on("connection", (socket) => {
   console.log(`[socket] Cliente conectado: ${socket.id}`);

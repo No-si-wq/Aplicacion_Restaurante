@@ -11,6 +11,7 @@ import LoginView from "./views/LoginView";
 import { TicketTemplateEditorView } from "./views/TicketTemplateEditorView";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import FacturasView from "./views/FacturasView";
+import ShiftManager from "./components/ShiftManager";
 
 export default function App() {
   return (
@@ -123,6 +124,19 @@ function AppContent() {
                 Usuarios
               </NavLink>
             )}
+            
+            <NavLink
+              to="/turnos"
+              className={({ isActive }) =>
+                `text-xs px-3 py-1.5 rounded-lg border transition-colors ${
+                  isActive
+                    ? "border-gray-800 text-gray-900 bg-gray-100"
+                    : "border-gray-200 text-gray-400 hover:text-gray-600 hover:border-gray-300"
+                }`
+              }
+            >
+              Turnos
+            </NavLink>
 
             {user?.role === "ADMIN" && (
               <NavLink
@@ -197,6 +211,14 @@ function AppContent() {
           element={
             <AdminGuard>
               <UserManager />
+            </AdminGuard>
+          }
+        />
+        <Route
+          path="/turnos"
+          element={
+            <AdminGuard>
+              <ShiftManager />
             </AdminGuard>
           }
         />
@@ -306,6 +328,13 @@ function AppContent() {
             className="block px-4 py-3 text-sm font-medium text-gray-700 rounded-lg hover:bg-gray-100"
           >
             Usuarios
+          </NavLink>
+          <NavLink
+            to="/turnos"
+            onClick={() => setShowMore(false)}
+            className="block px-4 py-3 text-sm font-medium text-gray-700 rounded-lg hover:bg-gray-100"
+          >
+            Turnos
           </NavLink>
           <NavLink
             to="/formato-ticket"

@@ -17,6 +17,7 @@ model Company {
   categories      Category[]
   orders          Order[]
   products        Product[]
+  shifts          Shift[]
   tables          Table[]
   ticketTemplates TicketTemplate[]
   users           User[]
@@ -44,14 +45,16 @@ model Cai {
 }
 
 model User {
-  id        String   @id @default(uuid())
-  username  String
-  password  String
-  role      Role     @default(VENDEDOR)
-  createdAt DateTime @default(now())
-  companyId String
-  cais      Cai[]
-  company   Company  @relation(fields: [companyId], references: [id])
+  id           String   @id @default(uuid())
+  username     String
+  password     String
+  role         Role     @default(VENDEDOR)
+  createdAt    DateTime @default(now())
+  companyId    String
+  cais         Cai[]
+  closedShifts Shift[]  @relation("ShiftClosedBy")
+  openedShifts Shift[]  @relation("ShiftOpenedBy")
+  company      Company  @relation(fields: [companyId], references: [id])
 
   @@unique([companyId, username])
 }
@@ -90,8 +93,10 @@ model Order {
   invoiceNumber Int?
   caiId         String?
   companyId     String
+  shiftId       String?
   cai           Cai?        @relation(fields: [caiId], references: [id])
   company       Company     @relation(fields: [companyId], references: [id])
+  shift         Shift?      @relation(fields: [shiftId], references: [id])
   table         Table       @relation(fields: [tableId], references: [id])
   items         OrderItem[]
 }
@@ -140,6 +145,23 @@ model TicketTemplate {
   updatedAt DateTime @updatedAt
   companyId String
   company   Company  @relation(fields: [companyId], references: [id])
+}
+
+model Shift {
+  id         String    @id @default(uuid())
+  name       String
+  status     String    @default("open")
+  openedAt   DateTime  @default(now())
+  closedAt   DateTime?
+  openedById String
+  closedById String?
+  companyId  String?
+  orders     Order[]
+  closedBy   User?     @relation("ShiftClosedBy", fields: [closedById], references: [id])
+  company    Company?  @relation(fields: [companyId], references: [id])
+  openedBy   User      @relation("ShiftOpenedBy", fields: [openedById], references: [id])
+
+  @@index([companyId, status])
 }
 
 enum Role {

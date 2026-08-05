@@ -100,6 +100,11 @@ export function tablesRouter(io: Server): Router {
         const userId = req.user!.id;
 
         const result = await prisma.$transaction(async (tx) => {
+          const shift = await tx.shift.findFirst({
+            where: { companyId: req.user!.companyId, status: "open", openedById: userId },
+          });
+          if (!shift) throw new Error("NO_SHIFT");
+
           const cai = await tx.cai.findFirst({
             where: { 
               userId, 
@@ -121,7 +126,12 @@ export function tablesRouter(io: Server): Router {
 
           await tx.order.updateMany({
             where: { id: { in: activeOrders.map((o) => o.id) } },
-            data: { caiId: cai.id, invoiceNumber: nextNumber, status: "delivered" },
+            data: { 
+              caiId: cai.id, 
+              invoiceNumber: nextNumber, 
+              status: "delivered",
+              shiftId: shift.id,
+            },
           });
 
           const table = await tx.table.update({
@@ -160,6 +170,9 @@ export function tablesRouter(io: Server): Router {
       }
       if (error instanceof Error && error.message === "CAI_AGOTADO") {
         return res.status(409).json({ error: "El rango de CAI está agotado" });
+      }
+      if (error instanceof Error && error.message === "NO_SHIFT") {
+        return res.status(409).json({ error: "No hay un turno abierto. Abre un turno antes de facturar." });
       }
       res.status(500).json({ error: "Error al actualizar la mesa" });
     }

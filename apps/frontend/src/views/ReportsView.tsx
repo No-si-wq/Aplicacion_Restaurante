@@ -1,26 +1,47 @@
 // apps/frontend/src/views/ReportsView.tsx
-import { useState } from "react";
-import { getSalesReport, getProductsReport, type SalesReport, type ProductsSalesReport } from "../services/api";
+import { useEffect, useState } from "react"; // useEffect agregado
+import type { Shift } from "@restaurante/types"; // NUEVO
+import {
+  getSalesReport, getProductsReport,
+  getSalesReportByShift, getProductsReportByShift, // NUEVO
+  getShifts, // NUEVO
+  type SalesReport, type ProductsSalesReport,
+} from "../services/api";
 import { exportToExcel, exportToPDF } from "../utils/exportReport";
 
 export default function ReportsView() {
   const today = new Date().toISOString().slice(0, 10);
-  const [tab, setTab]         = useState<"ventas" | "productos">("ventas");
-  const [from, setFrom]       = useState(today);
-  const [to, setTo]           = useState(today);
-  const [data, setData]       = useState<SalesReport | null>(null);
+  const [tab, setTab] = useState<"ventas" | "productos">("ventas");
+  const [mode, setMode] = useState<"fechas" | "turno">("fechas"); // NUEVO
+  const [shifts, setShifts] = useState<Shift[]>([]); // NUEVO
+  const [selectedShift, setSelectedShift] = useState(""); // NUEVO
+  const [from, setFrom] = useState(today);
+  const [to, setTo] = useState(today);
+  const [data, setData] = useState<SalesReport | null>(null);
   const [productsData, setProductsData] = useState<ProductsSalesReport | null>(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError]     = useState("");
+  const [error, setError] = useState("");
+
+  useEffect(() => { // NUEVO
+    getShifts().then(setShifts).catch(() => {});
+  }, []);
 
   const fetchReport = async () => {
     setLoading(true); setError("");
     try {
+      if (mode === "turno" && !selectedShift) {
+        setError("Selecciona un turno");
+        return;
+      }
       if (tab === "ventas") {
-        const report = await getSalesReport(from, to);
+        const report = mode === "turno"
+          ? await getSalesReportByShift(selectedShift)
+          : await getSalesReport(from, to);
         setData(report);
       } else {
-        const report = await getProductsReport(from, to);
+        const report = mode === "turno"
+          ? await getProductsReportByShift(selectedShift)
+          : await getProductsReport(from, to);
         setProductsData(report);
       }
     } catch {
@@ -113,35 +134,71 @@ export default function ReportsView() {
         </button>
       </div>
 
+
+
       {/* Controles de fecha
           CAMBIO: flex-col en móvil → flex-row desde sm */}
-      <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 sm:items-end mb-6">
-        <label className="flex flex-col gap-1 text-sm">
-          Desde
-          <input
-            type="date"
-            value={from}
-            onChange={(e) => setFrom(e.target.value)}
-            className="border rounded px-2 py-1.5"
-          />
-        </label>
-        <label className="flex flex-col gap-1 text-sm">
-          Hasta
-          <input
-            type="date"
-            value={to}
-            onChange={(e) => setTo(e.target.value)}
-            className="border rounded px-2 py-1.5"
-          />
-        </label>
-        {/* CAMBIO: w-full en móvil, ancho automático desde sm */}
+      <div className="flex gap-1 bg-gray-100 p-1 rounded-lg mb-4 w-fit">
         <button
-          onClick={fetchReport}
-          className="w-full sm:w-auto bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+          onClick={() => setMode("fechas")}
+          className={`px-3 py-1 rounded-md text-sm ${mode === "fechas" ? "bg-white shadow-sm" : "text-gray-500"}`}
         >
-          {loading ? "Cargando..." : "Generar"}
+          Por fechas
+        </button>
+        <button
+          onClick={() => setMode("turno")}
+          className={`px-3 py-1 rounded-md text-sm ${mode === "turno" ? "bg-white shadow-sm" : "text-gray-500"}`}
+        >
+          Por turno
         </button>
       </div>
+
+      {mode === "fechas" ? (
+        <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 sm:items-end mb-6">
+          <label className="flex flex-col gap-1 text-sm">
+            Desde
+            <input
+              type="date"
+              value={from}
+              onChange={(e) => setFrom(e.target.value)}
+              className="border rounded px-2 py-1.5"
+            />
+          </label>
+          <label className="flex flex-col gap-1 text-sm">
+            Hasta
+            <input
+              type="date"
+              value={to}
+              onChange={(e) => setTo(e.target.value)}
+              className="border rounded px-2 py-1.5"
+            />
+          </label>
+          <button onClick={fetchReport} className="w-full sm:w-auto bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
+            {loading ? "Cargando..." : "Generar"}
+          </button>
+        </div>
+      ) : (
+        <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 sm:items-end mb-6">
+          <label className="flex flex-col gap-1 text-sm">
+            Turno
+            <select
+              value={selectedShift}
+              onChange={(e) => setSelectedShift(e.target.value)}
+              className="border rounded px-2 py-1.5"
+            >
+              <option value="">Selecciona un turno</option>
+              {shifts.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name} — {new Date(s.openedAt).toLocaleDateString("es-HN")} ({s.status === "open" ? "abierto" : "cerrado"})
+                </option>
+              ))}
+            </select>
+          </label>
+          <button onClick={fetchReport} className="w-full sm:w-auto bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
+            {loading ? "Cargando..." : "Generar"}
+          </button>
+        </div>
+      )}
 
       {error && <p className="text-red-500 mb-4">{error}</p>}
 
