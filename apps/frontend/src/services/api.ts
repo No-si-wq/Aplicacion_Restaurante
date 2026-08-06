@@ -1,6 +1,6 @@
 import type { 
   Order, Table, Product, Reservation, ReservationStatus, 
-  Category, CaiAdmin, TicketTemplateLayout, Shift,
+  Category, CaiAdmin, TicketTemplateLayout, Shift, Business,
 } from "@restaurante/types";
 
 const BASE_URL = import.meta.env.VITE_API_URL + "/api";
@@ -407,3 +407,16 @@ export const closeShift = (id: string) =>
   request<Shift>(`/shifts/${id}/close`, { method: "PATCH" });
 
 export const getShifts = () => request<Shift[]>("/shifts");
+
+// ─── Negocio ──────────────────────────────────────────────
+
+export async function getBusiness(): Promise<Business> {
+  return request<Business>("/business");
+}
+
+export async function updateBusiness(data: Partial<Business>): Promise<Business> {
+  return request<Business>("/business", {
+    method: "PATCH",
+    body: JSON.stringify(data),
+  });
+}

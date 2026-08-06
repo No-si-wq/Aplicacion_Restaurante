@@ -13,6 +13,7 @@ model Company {
   isActive        Boolean          @default(true)
   plan            String           @default("basic")
   createdAt       DateTime         @default(now())
+  business        Business?
   cais            Cai[]
   categories      Category[]
   orders          Order[]
@@ -21,6 +22,20 @@ model Company {
   tables          Table[]
   ticketTemplates TicketTemplate[]
   users           User[]
+}
+
+model Business {
+  id              String   @id @default(uuid())
+  companyId       String   @unique
+  razonSocial     String
+  rtn             String
+  direccion       String
+  nombreComercial String?
+  telefono        String?
+  logoUrl         String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  company         Company  @relation(fields: [companyId], references: [id])
 }
 
 model Cai {

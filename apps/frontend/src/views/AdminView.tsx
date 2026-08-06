@@ -5,9 +5,10 @@ import TableManager from "../components/TableManager";
 import ProductManager from "../components/ProductManager";
 import ReservationManager from "../components/ReservationManager";
 import { CaiManager } from "../components/CaiManager";
+import BusinessManager from "../components/BusinessManager";
 import type { Table, Product, Category } from "@restaurante/types";
 
-type Tab = "mesas" | "productos" | "reservas" | "cai";
+type Tab = "mesas" | "productos" | "reservas" | "cai" | "negocio";
 
 export default function AdminView() {
   const [activeTab, setActiveTab] = useState<Tab>("mesas");
@@ -72,7 +73,7 @@ export default function AdminView() {
           CAMBIO: overflow-x-auto para que las pestañas no se corten en pantallas pequeñas */}
       <div className="overflow-x-auto pb-1 mb-4">
         <div className="flex gap-1 bg-gray-100 p-1 rounded-lg w-fit min-w-full sm:min-w-0">
-          {(["mesas", "productos", "reservas", "cai"] as Tab[]).map((tab) => (
+          {(["mesas", "productos", "reservas", "cai", "negocio"] as Tab[]).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -106,6 +107,9 @@ export default function AdminView() {
       {activeTab === "cai" && (
         <CaiManager users={users} />
       )}
+       {activeTab === "negocio" && (
+         <BusinessManager />
+       )}
 
     </div>
   );

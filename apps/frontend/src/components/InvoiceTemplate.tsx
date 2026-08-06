@@ -1,36 +1,26 @@
 // apps/frontend/src/components/InvoiceTemplate.tsx
 import { useEffect, useState } from "react";
-import type { Order } from "@restaurante/types";
+import type { Order, Business } from "@restaurante/types";
 import { TICKET_FIELD_CATALOG } from "@restaurante/types";
-import { getTicketTemplates, type TicketTemplate } from "../services/api";
+import { getTicketTemplates, getBusiness, type TicketTemplate } from "../services/api";
 
 interface InvoiceTemplateProps {
   orders: Order[]; // todas las órdenes de la mesa ya facturadas (mismo caiId/invoiceNumber)
 }
 
-// TODO: mover a un modelo `Business` en la BD cuando se decida cómo administrar
-// los datos fiscales del negocio. Por ahora, variables de entorno como solución temporal.
-const BUSINESS = {
-  razonSocial: import.meta.env.VITE_BUSINESS_RAZON_SOCIAL ?? "",
-  rtn: import.meta.env.VITE_BUSINESS_RTN ?? "",
-  direccion: import.meta.env.VITE_BUSINESS_DIRECCION ?? "",
-  nombreComercial: import.meta.env.VITE_BUSINESS_NOMBRE_COMERCIAL ?? "",
-  telefono: import.meta.env.VITE_BUSINESS_TELEFONO ?? "",
-  logoUrl: import.meta.env.VITE_BUSINESS_LOGO_URL ?? "",
-};
-
 export function InvoiceTemplate({ orders }: InvoiceTemplateProps) {
   const [templates, setTemplates] = useState<TicketTemplate[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [business, setBusiness] = useState<Business | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
-    getTicketTemplates()
-      .then((list) => {
+    Promise.all([getTicketTemplates(), getBusiness()])
+      .then(([list, biz]) => {
         setTemplates(list);
-        // por defecto: la plantilla activa; si no hay activa, la más reciente
         const active = list.find((t) => t.isActive) ?? list[0] ?? null;
         setSelectedId(active?.id ?? null);
+        setBusiness(biz);
       })
       .catch((e) => setLoadError(e.message ?? "No se pudo cargar el formato de ticket"));
   }, []);
@@ -58,11 +48,12 @@ export function InvoiceTemplate({ orders }: InvoiceTemplateProps) {
 
   function getFieldValue(key: string): string {
     switch (key) {
-      case "razon_social_emisor": return BUSINESS.razonSocial;
-      case "rtn_emisor": return BUSINESS.rtn;
-      case "direccion_emision": return BUSINESS.direccion;
-      case "nombre_comercial": return BUSINESS.nombreComercial;
-      case "telefono": return BUSINESS.telefono;
+      case "razon_social_emisor": return business?.razonSocial ?? "";
+      case "rtn_emisor": return business?.rtn ?? "";
+      case "direccion_emision": return business?.direccion ?? "";
+      case "nombre_comercial": return business?.nombreComercial ?? "";
+      case "telefono": return business?.telefono ?? "";
+      case "cai": return cai?.code ?? "Sin CAI";
       case "cai": return cai?.code ?? "Sin CAI";
       case "rango_autorizado": return cai ? `${cai.rangeStart}-${cai.rangeEnd}` : "";
       case "fecha_limite_emision": return cai?.limitDate?.slice(0, 10) ?? "";
@@ -159,9 +150,9 @@ export function InvoiceTemplate({ orders }: InvoiceTemplateProps) {
 
           // Logo: imagen, no texto
           if (field.key === "logo") {
-            return BUSINESS.logoUrl ? (
+            return business?.logoUrl ? (
               <div key={field.key} className={alignClass}>
-                <img src={BUSINESS.logoUrl} alt="Logo" className="h-10 mx-auto" />
+                <img src={business.logoUrl} alt="Logo" className="h-10 mx-auto" />
               </div>
             ) : null;
           }
